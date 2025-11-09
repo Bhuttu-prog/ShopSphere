@@ -26,13 +26,29 @@ public class RecommendationService {
     @Cacheable(value = "recommendations", key = "#productId")
     public List<Product> getRecommendations(Long productId) {
         List<ProductAssociation> associations = 
-            associationRepository.findTopAssociationsByProductId(productId);
+            associationRepository.findTopAssociationsByProductIdOrderByAssociationStrengthDesc(productId);
         
-        return associations.stream()
+        List<Product> recommended = associations.stream()
             .map(ProductAssociation::getAssociatedProduct)
             .filter(p -> p.getStock() > 0) // Only recommend in-stock products
-            .limit(5) // Limit to top 5 recommendations
+            .limit(8) // Limit to top 8 recommendations
             .collect(Collectors.toList());
+        
+        // If not enough recommendations, add products from same category
+        if (recommended.size() < 4) {
+            Product product = productRepository.findById(productId).orElse(null);
+            if (product != null) {
+                List<Product> sameCategory = productRepository.findByCategory(product.getCategory())
+                    .stream()
+                    .filter(p -> !p.getId().equals(productId) && p.getStock() > 0)
+                    .filter(p -> recommended.stream().noneMatch(r -> r.getId().equals(p.getId())))
+                    .limit(4 - recommended.size())
+                    .collect(Collectors.toList());
+                recommended.addAll(sameCategory);
+            }
+        }
+        
+        return recommended;
     }
     
     /**

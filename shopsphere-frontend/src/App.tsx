@@ -4,8 +4,8 @@ import { Toaster } from 'react-hot-toast';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 import Home from './pages/Home';
-import Products from './pages/Products';
-import ProductDetail from './components/product/ProductDetail';
+import ProductsEnhanced from './pages/ProductsEnhanced';
+import ProductDetailFlipkartStyle from './components/product/ProductDetailFlipkartStyle';
 import Cart from './pages/Cart';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -21,8 +21,8 @@ function App() {
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/products" element={<ProductsEnhanced />} />
+            <Route path="/products/:id" element={<ProductDetailFlipkartStyle />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

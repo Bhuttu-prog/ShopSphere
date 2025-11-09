@@ -45,9 +45,26 @@ export const fetchProducts = createAsyncThunk(
 
 export const fetchProductById = createAsyncThunk(
   'products/fetchById',
-  async (id: number) => {
-    const response = await axios.get(`${API_URL}/products/${id}`);
-    return response.data;
+  async (id: number, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_URL}/products/${id}`);
+      if (response.data) {
+        return response.data;
+      }
+      return rejectWithValue('Product not found');
+    } catch (error: any) {
+      console.error('Error fetching product:', error);
+      if (error.response?.status === 404) {
+        return rejectWithValue(`Product with ID ${id} not found`);
+      }
+      if (error.response?.status === 403) {
+        return rejectWithValue('Access denied. Please check backend security configuration.');
+      }
+      if (error.code === 'ECONNREFUSED') {
+        return rejectWithValue('Backend server is not running. Please start the backend.');
+      }
+      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch product');
+    }
   }
 );
 
@@ -108,7 +125,7 @@ const productSlice = createSlice({
       .addCase(fetchProductById.rejected, (state, action) => {
         state.loading = false;
         state.currentProduct = null;
-        state.error = action.error.message || 'Failed to fetch product';
+        state.error = action.payload as string || action.error.message || 'Failed to fetch product';
       })
       .addCase(fetchRecommendations.fulfilled, (state, action) => {
         state.recommendations = action.payload;

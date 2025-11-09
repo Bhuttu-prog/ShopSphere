@@ -12,5 +12,8 @@ public interface ProductAssociationRepository extends JpaRepository<ProductAssoc
     
     @Query("SELECT pa FROM ProductAssociation pa WHERE pa.product.id = :productId ORDER BY pa.associationStrength DESC")
     List<ProductAssociation> findTopAssociationsByProductId(Long productId);
+    
+    @Query("SELECT pa FROM ProductAssociation pa WHERE pa.product.id = :productId ORDER BY pa.associationStrength DESC")
+    List<ProductAssociation> findTopAssociationsByProductIdOrderByAssociationStrengthDesc(Long productId);
 }
 
