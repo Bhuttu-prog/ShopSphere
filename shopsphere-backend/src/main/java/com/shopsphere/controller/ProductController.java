@@ -26,9 +26,14 @@ public class ProductController {
     
     @GetMapping("/{id}")
     public ResponseEntity<Product> getProductById(@PathVariable Long id) {
-        return productService.getProductById(id)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
+        try {
+            return productService.getProductById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
     
     @GetMapping("/category/{category}")
@@ -48,7 +53,12 @@ public class ProductController {
     
     @GetMapping("/{id}/recommendations")
     public ResponseEntity<List<Product>> getRecommendations(@PathVariable Long id) {
-        return ResponseEntity.ok(recommendationService.getRecommendations(id));
+        try {
+            return ResponseEntity.ok(recommendationService.getRecommendations(id));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.ok(List.of()); // Return empty list on error instead of 500
+        }
     }
     
     @PostMapping

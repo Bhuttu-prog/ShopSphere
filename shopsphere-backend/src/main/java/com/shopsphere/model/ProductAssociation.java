@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "product_associations")
@@ -17,6 +18,7 @@ public class ProductAssociation {
     
     @ManyToOne
     @JoinColumn(name = "product_id", nullable = false)
+    @JsonIgnore
     private Product product;
     
     @ManyToOne

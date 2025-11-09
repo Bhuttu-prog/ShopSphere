@@ -39,7 +39,10 @@ public class Product {
     @JsonIgnore
     private Set<ProductAssociation> associations;
     
+    @JsonIgnore
     private LocalDateTime createdAt;
+    
+    @JsonIgnore
     private LocalDateTime updatedAt;
     
     @PrePersist

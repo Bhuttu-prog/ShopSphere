@@ -5,10 +5,12 @@ import com.shopsphere.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@Transactional
 public class ProductService {
     
     @Autowired
@@ -20,7 +22,20 @@ public class ProductService {
     
     @Cacheable(value = "products", key = "#id")
     public Optional<Product> getProductById(Long id) {
-        return productRepository.findById(id);
+        try {
+            Optional<Product> product = productRepository.findById(id);
+            if (product.isPresent()) {
+                // Force initialization of lazy associations to avoid serialization issues
+                Product p = product.get();
+                if (p.getAssociations() != null) {
+                    p.getAssociations().size(); // Force initialization
+                }
+            }
+            return product;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     public List<Product> getProductsByCategory(String category) {

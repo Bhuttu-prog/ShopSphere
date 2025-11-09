@@ -114,21 +114,42 @@ const ProductDetailFlipkartStyle: React.FC = () => {
   }
 
   if (error || !currentProduct) {
+    const errorMessage = typeof error === 'string' 
+      ? error 
+      : error 
+        ? "Request failed with status code 500"
+        : "The product you're looking for doesn't exist or has been removed.";
+    
     return (
       <div className="bg-gray-50 min-h-screen">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Product not found</h2>
-            <p className="text-gray-600 mb-6">
-              {typeof error === 'string' ? error : "The product you're looking for doesn't exist or has been removed."}
-            </p>
-            <button
-              onClick={() => navigate('/products')}
-              className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition inline-flex items-center gap-2"
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-              Browse Products
-            </button>
+            <p className="text-gray-600 mb-6">{errorMessage}</p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => navigate('/products')}
+                className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition inline-flex items-center gap-2"
+              >
+                <ArrowLeftIcon className="w-5 h-5" />
+                Browse Products
+              </button>
+              {error && (
+                <button
+                  onClick={() => {
+                    if (id) {
+                      const productId = Number(id);
+                      if (!isNaN(productId) && productId > 0) {
+                        dispatch(fetchProductById(productId));
+                      }
+                    }
+                  }}
+                  className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

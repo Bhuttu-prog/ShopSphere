@@ -158,19 +158,19 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("Phone Case - Clear", 
             "Protective clear case, shock absorption, raised edges, wireless charging compatible", 
             new BigDecimal("24.99"), 
-            "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-nfWPbwWFTTs?w=500&h=500&fit=crop",
             "Accessories", 300, 4.5, 250));
         
         allProducts.add(createProduct("USB-C Fast Charging Cable", 
             "6ft braided cable, 3A fast charging, data transfer, durable design, multiple device support", 
             new BigDecimal("19.99"), 
-            "https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-dYocS1QjjvI?w=500&h=500&fit=crop",
             "Accessories", 500, 4.6, 400));
         
         allProducts.add(createProduct("Wireless Charging Pad", 
             "15W fast wireless charger, LED indicator, non-slip surface, compatible with all Qi devices", 
             new BigDecimal("39.99"), 
-            "https://images.unsplash.com/photo-1609091839311-d5365f9ff1e8?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-r0Do56ntkBs?w=500&h=500&fit=crop",
             "Accessories", 150, 4.7, 220));
         
         allProducts.add(createProduct("Laptop Backpack", 
@@ -214,7 +214,7 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("Dumbbell Set", 
             "Adjustable dumbbell set, 5-50 lbs per dumbbell, compact design, perfect for home gym", 
             new BigDecimal("149.99"), 
-            "https://images.unsplash.com/photo-1571019613454-1cb2f99b84d4?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-dhJd3ax1pFs?w=500&h=500&fit=crop",
             "Sports", 40, 4.7, 95));
         
         // Save all products
