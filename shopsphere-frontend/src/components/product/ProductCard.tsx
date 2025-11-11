@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Product } from '../../store/slices/productSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { addToCart } from '../../store/slices/cartSlice';
+import { addToWishlist, removeFromWishlist, checkWishlistStatus } from '../../store/slices/wishlistSlice';
 import { toast } from 'react-hot-toast';
 import { ShoppingCartIcon, HeartIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
@@ -13,11 +14,28 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const [imageError, setImageError] = React.useState(false);
-  const [isWishlisted, setIsWishlisted] = React.useState(false);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector(state => state.auth);
+  const { user, isAuthenticated } = useAppSelector(state => state.auth);
+  const { wishlistStatus } = useAppSelector(state => state.wishlist);
+  // Only show wishlisted if user is authenticated, otherwise always false
+  const isWishlisted = (isAuthenticated && user) ? (wishlistStatus[product.id] || false) : false;
   const defaultImage = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop';
+
+  // Check wishlist status when component mounts or user logs in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      dispatch(checkWishlistStatus(product.id));
+    }
+  }, [dispatch, product.id, isAuthenticated, user]);
+  
+  // Clear wishlist status when user logs out
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      // Wishlist status will be cleared by the logout action in wishlistSlice
+      // This effect ensures UI updates immediately
+    }
+  }, [isAuthenticated, user]);
 
   const handleImageError = () => {
     setImageError(true);
@@ -51,10 +69,26 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     toast.success('Added to cart!');
   };
 
-  const handleWishlist = (e: React.MouseEvent) => {
+  const handleWishlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
-    toast.success(isWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
+    
+    if (!user || !isAuthenticated) {
+      toast.error('Please login to add items to wishlist');
+      navigate('/login');
+      return;
+    }
+    
+    try {
+      if (isWishlisted) {
+        await dispatch(removeFromWishlist(product.id)).unwrap();
+        toast.success('Removed from wishlist');
+      } else {
+        await dispatch(addToWishlist(product.id)).unwrap();
+        toast.success('Added to wishlist');
+      }
+    } catch (error: any) {
+      toast.error(error || 'Failed to update wishlist');
+    }
   };
 
   // Calculate discount (mock - in real app, this would come from backend)

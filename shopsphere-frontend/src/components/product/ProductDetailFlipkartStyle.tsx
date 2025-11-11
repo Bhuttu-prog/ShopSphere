@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { fetchProductById, fetchRecommendations, fetchFrequentlyBoughtTogether, fetchProducts } from '../../store/slices/productSlice';
 import ProductList from './ProductList';
 import { addToCart } from '../../store/slices/cartSlice';
+import { addToWishlist, removeFromWishlist, checkWishlistStatus } from '../../store/slices/wishlistSlice';
 import { toast } from 'react-hot-toast';
 import { 
   ShoppingCartIcon, 
@@ -23,13 +24,16 @@ const ProductDetailFlipkartStyle: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { currentProduct, recommendations, frequentlyBoughtTogether, products, loading, error } = useAppSelector(state => state.products);
-  const { user } = useAppSelector(state => state.auth);
+  const { user, isAuthenticated } = useAppSelector(state => state.auth);
+  const { wishlistStatus } = useAppSelector(state => state.wishlist);
   const userId = user?.id || 1;
   const [imageError, setImageError] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const [activeTab, setActiveTab] = useState<'description' | 'specifications' | 'reviews'>('description');
+  
+  // Get wishlist status from Redux, default to false if not authenticated
+  const isWishlisted = (currentProduct && isAuthenticated) ? (wishlistStatus[currentProduct.id] || false) : false;
   const defaultImage = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&h=600&fit=crop';
 
   useEffect(() => {
@@ -39,12 +43,16 @@ const ProductDetailFlipkartStyle: React.FC = () => {
         dispatch(fetchProductById(productId));
         dispatch(fetchRecommendations(productId));
         dispatch(fetchFrequentlyBoughtTogether(productId));
+        // Check wishlist status if user is authenticated
+        if (isAuthenticated && user) {
+          dispatch(checkWishlistStatus(productId));
+        }
         // Reset image error state when product changes
         setImageError(false);
         setSelectedImage(0);
       }
     }
-  }, [id, dispatch]);
+  }, [id, dispatch, isAuthenticated, user]);
 
   // Fetch all products if not loaded (for similar products)
   useEffect(() => {
@@ -94,9 +102,26 @@ const ProductDetailFlipkartStyle: React.FC = () => {
     }
   };
 
-  const handleWishlist = () => {
-    setIsWishlisted(!isWishlisted);
-    toast.success(isWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
+  const handleWishlist = async () => {
+    if (!user || !isAuthenticated) {
+      toast.error('Please login to add items to wishlist');
+      navigate('/login');
+      return;
+    }
+    
+    if (!currentProduct) return;
+    
+    try {
+      if (isWishlisted) {
+        await dispatch(removeFromWishlist(currentProduct.id)).unwrap();
+        toast.success('Removed from wishlist');
+      } else {
+        await dispatch(addToWishlist(currentProduct.id)).unwrap();
+        toast.success('Added to wishlist');
+      }
+    } catch (error: any) {
+      toast.error(error || 'Failed to update wishlist');
+    }
   };
 
   // Product images array - for iPhone 15 Pro, show 5 different angles

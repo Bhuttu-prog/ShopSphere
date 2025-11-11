@@ -37,6 +37,7 @@ public class RecommendationService {
             .collect(Collectors.toList());
         
         // If not enough recommendations, add products from same category
+        // This provides contextual recommendations (e.g., trousers -> other clothing, gym equipment -> other sports items)
         if (recommended.size() < 4) {
             Product product = productRepository.findById(productId).orElse(null);
             if (product != null) {
@@ -44,6 +45,8 @@ public class RecommendationService {
                     .stream()
                     .filter(p -> !p.getId().equals(productId) && p.getStock() > 0)
                     .filter(p -> recommended.stream().noneMatch(r -> r.getId().equals(p.getId())))
+                    .sorted((p1, p2) -> Double.compare(p2.getRating() * p2.getReviewCount(), 
+                                                       p1.getRating() * p1.getReviewCount())) // Sort by popularity
                     .limit(4 - recommended.size())
                     .collect(Collectors.toList());
                 recommended.addAll(sameCategory);

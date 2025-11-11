@@ -6,6 +6,7 @@ import com.shopsphere.repository.ProductRepository;
 import com.shopsphere.repository.ProductAssociationRepository;
 import com.shopsphere.repository.CartRepository;
 import com.shopsphere.repository.OrderRepository;
+import com.shopsphere.repository.WishlistRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -30,12 +31,16 @@ public class DataSeederService implements CommandLineRunner {
     @Autowired
     private OrderRepository orderRepository;
     
+    @Autowired
+    private WishlistRepository wishlistRepository;
+    
     @Override
     @Transactional
     public void run(String... args) {
         // Clear existing data in correct order to avoid foreign key constraint violations
-        // Delete cart items and orders first (they reference products)
+        // Delete cart items, wishlist, and orders first (they reference products)
         cartRepository.deleteAll();
+        wishlistRepository.deleteAll();
         orderRepository.deleteAll();
         // Then delete associations and products
         associationRepository.deleteAll();
@@ -1120,6 +1125,286 @@ public class DataSeederService implements CommandLineRunner {
         if (tv != null && headphones != null) {
             createAssociation(tv.getId(), headphones.getId(), 
                 ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.72);
+        }
+        
+        // ========== ENHANCED CONTEXTUAL RECOMMENDATIONS ==========
+        
+        // Clothing: Pants/Jeans/Chinos -> T-Shirts, Polo Shirts, Hoodies (Complementary)
+        Product chinos = savedProducts.stream().filter(p -> p.getName().contains("Chino")).findFirst().orElse(null);
+        Product poloShirt = savedProducts.stream().filter(p -> p.getName().contains("Polo")).findFirst().orElse(null);
+        Product hoodie = savedProducts.stream().filter(p -> p.getName().contains("Hooded") || p.getName().contains("Hoodie")).findFirst().orElse(null);
+        Product cardigan = savedProducts.stream().filter(p -> p.getName().contains("Cardigan")).findFirst().orElse(null);
+        Product blazer = savedProducts.stream().filter(p -> p.getName().contains("Blazer")).findFirst().orElse(null);
+        
+        // Pants/Jeans/Chinos -> T-Shirts (High association - frequently bought together)
+        if (jeans != null && tshirt != null) {
+            createAssociation(jeans.getId(), tshirt.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+            createAssociation(tshirt.getId(), jeans.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+        }
+        if (chinos != null && tshirt != null) {
+            createAssociation(chinos.getId(), tshirt.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.87);
+            createAssociation(tshirt.getId(), chinos.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.87);
+        }
+        
+        // Pants/Jeans/Chinos -> Polo Shirts (Business casual)
+        if (jeans != null && poloShirt != null) {
+            createAssociation(jeans.getId(), poloShirt.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.85);
+            createAssociation(poloShirt.getId(), jeans.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.85);
+        }
+        if (chinos != null && poloShirt != null) {
+            createAssociation(chinos.getId(), poloShirt.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+            createAssociation(poloShirt.getId(), chinos.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+        }
+        
+        // Pants/Jeans -> Hoodies (Casual wear)
+        if (jeans != null && hoodie != null) {
+            createAssociation(jeans.getId(), hoodie.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.82);
+            createAssociation(hoodie.getId(), jeans.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.82);
+        }
+        
+        // Blazer + Chinos/Pants (Formal wear)
+        if (blazer != null && chinos != null) {
+            createAssociation(blazer.getId(), chinos.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.92);
+            createAssociation(chinos.getId(), blazer.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.92);
+        }
+        if (blazer != null && poloShirt != null) {
+            createAssociation(blazer.getId(), poloShirt.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+        }
+        
+        // Cardigan + T-Shirt (Layering)
+        if (cardigan != null && tshirt != null) {
+            createAssociation(cardigan.getId(), tshirt.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.80);
+            createAssociation(tshirt.getId(), cardigan.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.80);
+        }
+        
+        // Gym Equipment: Comprehensive associations
+        Product weightBench = savedProducts.stream().filter(p -> p.getName().contains("Weight Bench")).findFirst().orElse(null);
+        Product kettlebell = savedProducts.stream().filter(p -> p.getName().contains("Kettlebell")).findFirst().orElse(null);
+        Product pullUpBar = savedProducts.stream().filter(p -> p.getName().contains("Pull-Up")).findFirst().orElse(null);
+        Product foamRoller = savedProducts.stream().filter(p -> p.getName().contains("Foam Roller")).findFirst().orElse(null);
+        Product yogaBlocks = savedProducts.stream().filter(p -> p.getName().contains("Yoga Block")).findFirst().orElse(null);
+        Product gymGloves = savedProducts.stream().filter(p -> p.getName().contains("Gym Gloves")).findFirst().orElse(null);
+        Product proteinShaker = savedProducts.stream().filter(p -> p.getName().contains("Protein Shaker")).findFirst().orElse(null);
+        Product exerciseBike = savedProducts.stream().filter(p -> p.getName().contains("Exercise Bike")).findFirst().orElse(null);
+        Product punchingBag = savedProducts.stream().filter(p -> p.getName().contains("Punching Bag")).findFirst().orElse(null);
+        
+        // Dumbbells -> Other gym equipment (Frequently Bought Together)
+        if (dumbbells != null) {
+            if (weightBench != null) {
+                createAssociation(dumbbells.getId(), weightBench.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.92);
+                createAssociation(weightBench.getId(), dumbbells.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.92);
+            }
+            if (resistanceBands != null) {
+                createAssociation(dumbbells.getId(), resistanceBands.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+            }
+            if (kettlebell != null) {
+                createAssociation(dumbbells.getId(), kettlebell.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.85);
+                createAssociation(kettlebell.getId(), dumbbells.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.85);
+            }
+            if (gymGloves != null) {
+                createAssociation(dumbbells.getId(), gymGloves.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+            }
+            if (proteinShaker != null) {
+                createAssociation(dumbbells.getId(), proteinShaker.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.75);
+            }
+        }
+        
+        // Weight Bench -> Dumbbells, Resistance Bands, Gym Gloves
+        if (weightBench != null) {
+            if (dumbbells != null) {
+                createAssociation(weightBench.getId(), dumbbells.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.92);
+            }
+            if (resistanceBands != null) {
+                createAssociation(weightBench.getId(), resistanceBands.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.80);
+            }
+            if (gymGloves != null) {
+                createAssociation(weightBench.getId(), gymGloves.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+            }
+        }
+        
+        // Resistance Bands -> Yoga Mat, Foam Roller (Flexibility and recovery)
+        if (resistanceBands != null) {
+            if (yogaMat != null) {
+                createAssociation(resistanceBands.getId(), yogaMat.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.85);
+                createAssociation(yogaMat.getId(), resistanceBands.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.85);
+            }
+            if (foamRoller != null) {
+                createAssociation(resistanceBands.getId(), foamRoller.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.78);
+                createAssociation(foamRoller.getId(), resistanceBands.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.78);
+            }
+        }
+        
+        // Yoga Mat -> Yoga Blocks, Foam Roller (Yoga essentials)
+        if (yogaMat != null) {
+            if (yogaBlocks != null) {
+                createAssociation(yogaMat.getId(), yogaBlocks.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+                createAssociation(yogaBlocks.getId(), yogaMat.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+            }
+            if (foamRoller != null) {
+                createAssociation(yogaMat.getId(), foamRoller.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.82);
+            }
+        }
+        
+        // Pull-Up Bar -> Gym Gloves, Resistance Bands
+        if (pullUpBar != null) {
+            if (gymGloves != null) {
+                createAssociation(pullUpBar.getId(), gymGloves.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+            }
+            if (resistanceBands != null) {
+                createAssociation(pullUpBar.getId(), resistanceBands.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.75);
+            }
+        }
+        
+        // Exercise Bike -> Gym Gloves, Protein Shaker, Foam Roller
+        if (exerciseBike != null) {
+            if (gymGloves != null) {
+                createAssociation(exerciseBike.getId(), gymGloves.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.70);
+            }
+            if (proteinShaker != null) {
+                createAssociation(exerciseBike.getId(), proteinShaker.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.75);
+            }
+            if (foamRoller != null) {
+                createAssociation(exerciseBike.getId(), foamRoller.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.72);
+            }
+        }
+        
+        // Punching Bag -> Gym Gloves (Essential)
+        if (punchingBag != null && gymGloves != null) {
+            createAssociation(punchingBag.getId(), gymGloves.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.95);
+            createAssociation(gymGloves.getId(), punchingBag.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.95);
+        }
+        
+        // Kettlebell -> Dumbbells, Resistance Bands, Gym Gloves
+        if (kettlebell != null) {
+            if (dumbbells != null) {
+                createAssociation(kettlebell.getId(), dumbbells.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.85);
+            }
+            if (resistanceBands != null) {
+                createAssociation(kettlebell.getId(), resistanceBands.getId(), 
+                    ProductAssociation.AssociationType.COMPLEMENTARY, 0.80);
+            }
+            if (gymGloves != null) {
+                createAssociation(kettlebell.getId(), gymGloves.getId(), 
+                    ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+            }
+        }
+        
+        // Running Shoes -> Athletic Shorts, Gym Gloves (Sports wear)
+        Product runningShoes = savedProducts.stream().filter(p -> p.getName().contains("Running Shoes")).findFirst().orElse(null);
+        Product athleticShorts = savedProducts.stream().filter(p -> p.getName().contains("Athletic Shorts")).findFirst().orElse(null);
+        if (runningShoes != null && athleticShorts != null) {
+            createAssociation(runningShoes.getId(), athleticShorts.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+            createAssociation(athleticShorts.getId(), runningShoes.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+        }
+        
+        // More Clothing Combinations
+        Product sneakers = savedProducts.stream().filter(p -> p.getName().contains("Sneakers")).findFirst().orElse(null);
+        if (sneakers != null && jeans != null) {
+            createAssociation(sneakers.getId(), jeans.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.85);
+        }
+        if (sneakers != null && tshirt != null) {
+            createAssociation(sneakers.getId(), tshirt.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.80);
+        }
+        
+        // Winter/Outerwear combinations
+        Product winterJacket = savedProducts.stream().filter(p -> p.getName().contains("Winter Jacket")).findFirst().orElse(null);
+        Product woolCoat = savedProducts.stream().filter(p -> p.getName().contains("Wool Coat")).findFirst().orElse(null);
+        Product scarf = savedProducts.stream().filter(p -> p.getName().contains("Scarf")).findFirst().orElse(null);
+        Product trenchCoat = savedProducts.stream().filter(p -> p.getName().contains("Trench Coat")).findFirst().orElse(null);
+        
+        if (winterJacket != null && scarf != null) {
+            createAssociation(winterJacket.getId(), scarf.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.85);
+            createAssociation(scarf.getId(), winterJacket.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.85);
+        }
+        if (woolCoat != null && scarf != null) {
+            createAssociation(woolCoat.getId(), scarf.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+        }
+        if (trenchCoat != null && scarf != null) {
+            createAssociation(trenchCoat.getId(), scarf.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.82);
+        }
+        
+        // Home & Kitchen: More comprehensive associations
+        Product knifeSet = savedProducts.stream().filter(p -> p.getName().contains("Knife Set")).findFirst().orElse(null);
+        Product cuttingBoard = savedProducts.stream().filter(p -> p.getName().contains("Cutting Board")).findFirst().orElse(null);
+        Product toaster = savedProducts.stream().filter(p -> p.getName().contains("Toaster")).findFirst().orElse(null);
+        
+        if (knifeSet != null && cuttingBoard != null) {
+            createAssociation(knifeSet.getId(), cuttingBoard.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.92);
+            createAssociation(cuttingBoard.getId(), knifeSet.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.92);
+        }
+        if (coffeeMaker != null && toaster != null) {
+            createAssociation(coffeeMaker.getId(), toaster.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.75);
+        }
+        
+        // Beauty: Skincare combinations
+        Product serum = savedProducts.stream().filter(p -> p.getName().contains("Serum") && !p.getName().contains("Set")).findFirst().orElse(null);
+        Product moisturizer = savedProducts.stream().filter(p -> p.getName().contains("Moisturizing") || p.getName().contains("Cream")).findFirst().orElse(null);
+        Product cleanser = savedProducts.stream().filter(p -> p.getName().contains("Cleanser")).findFirst().orElse(null);
+        
+        if (serum != null && moisturizer != null) {
+            createAssociation(serum.getId(), moisturizer.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+            createAssociation(moisturizer.getId(), serum.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.90);
+        }
+        if (cleanser != null && moisturizer != null) {
+            createAssociation(cleanser.getId(), moisturizer.getId(), 
+                ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER, 0.88);
+        }
+        if (cleanser != null && serum != null) {
+            createAssociation(cleanser.getId(), serum.getId(), 
+                ProductAssociation.AssociationType.COMPLEMENTARY, 0.85);
         }
     }
     

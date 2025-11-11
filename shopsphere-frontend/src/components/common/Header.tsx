@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
 import { logout } from '../../store/slices/authSlice';
-import { ShoppingCartIcon, UserIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ShoppingCartIcon, UserIcon, Bars3Icon, XMarkIcon, HeartIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 
 const Header: React.FC = () => {
   const cartItems = useAppSelector(state => state.cart.items);
+  const wishlistItems = useAppSelector(state => state.wishlist.items);
   const { isAuthenticated, user } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const wishlistCount = wishlistItems.length;
 
   const handleLogout = () => {
     dispatch(logout());
@@ -43,6 +45,16 @@ const Header: React.FC = () => {
                 </span>
               )}
             </Link>
+            {isAuthenticated && (
+              <Link to="/wishlist" className="text-gray-700 hover:text-primary-600 transition relative">
+                <HeartIcon className="w-6 h-6" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+            )}
             
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
@@ -92,6 +104,11 @@ const Header: React.FC = () => {
             <Link to="/cart" className="block py-2 text-gray-700 hover:text-primary-600">
               Cart {cartCount > 0 && `(${cartCount})`}
             </Link>
+            {isAuthenticated && (
+              <Link to="/wishlist" className="block py-2 text-gray-700 hover:text-primary-600">
+                Wishlist {wishlistCount > 0 && `(${wishlistCount})`}
+              </Link>
+            )}
             {isAuthenticated ? (
               <>
                 <Link to="/profile" className="block py-2 text-gray-700 hover:text-primary-600">Profile</Link>
