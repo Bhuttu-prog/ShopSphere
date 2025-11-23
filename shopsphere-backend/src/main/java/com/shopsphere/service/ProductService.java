@@ -43,7 +43,10 @@ public class ProductService {
     }
     
     public List<Product> searchProducts(String query) {
-        return productRepository.findByNameContainingIgnoreCase(query);
+        if (query == null || query.trim().isEmpty()) {
+            return getAllProducts();
+        }
+        return productRepository.searchProducts(query.trim());
     }
     
     public List<Product> getTopRatedProducts() {

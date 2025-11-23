@@ -11,7 +11,7 @@ import {
 
 const ProductsEnhanced: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { products, loading, searchQuery } = useAppSelector(state => state.products);
+  const { products, loading, searchQuery, error } = useAppSelector(state => state.products);
   const [localQuery, setLocalQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [priceRange, setPriceRange] = useState({ min: 0, max: 5000 });
@@ -23,6 +23,13 @@ const ProductsEnhanced: React.FC = () => {
     console.log('ProductsEnhanced: Fetching products...');
     dispatch(fetchProducts());
   }, [dispatch]);
+
+  // Sync localQuery with searchQuery from Redux
+  useEffect(() => {
+    if (searchQuery) {
+      setLocalQuery(searchQuery);
+    }
+  }, [searchQuery]);
 
   const categories = Array.from(new Set(products.map(p => p.category)));
 
@@ -72,13 +79,20 @@ const ProductsEnhanced: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (localQuery.trim()) {
-      dispatch(setSearchQuery(localQuery));
-      dispatch(searchProducts(localQuery));
+    const trimmedQuery = localQuery.trim();
+    if (trimmedQuery) {
+      dispatch(setSearchQuery(trimmedQuery));
+      dispatch(searchProducts(trimmedQuery));
     } else {
       dispatch(setSearchQuery(''));
       dispatch(fetchProducts());
     }
+  };
+
+  const handleClearSearch = () => {
+    setLocalQuery('');
+    dispatch(setSearchQuery(''));
+    dispatch(fetchProducts());
   };
 
   const clearFilters = () => {
@@ -108,8 +122,17 @@ const ProductsEnhanced: React.FC = () => {
                   value={localQuery}
                   onChange={(e) => setLocalQuery(e.target.value)}
                   placeholder="Search for products, brands and more..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 />
+                {localQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <XMarkIcon className="w-5 h-5" />
+                  </button>
+                )}
               </div>
               <button
                 type="submit"
@@ -123,7 +146,9 @@ const ProductsEnhanced: React.FC = () => {
           {/* Sort and Filter Toggle */}
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-600">
-              {filteredProducts.length} products found
+              {searchQuery 
+                ? `${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''} found for "${searchQuery}"`
+                : `${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''} found`}
             </div>
             <div className="flex gap-4">
               <select
@@ -372,9 +397,31 @@ const ProductsEnhanced: React.FC = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
                 <p className="text-gray-600">Loading products...</p>
               </div>
+            ) : error ? (
+              <div className="text-center py-12 bg-white rounded-lg">
+                <p className="text-red-600 mb-4">Error: {error}</p>
+                <button
+                  onClick={() => dispatch(fetchProducts())}
+                  className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition"
+                >
+                  Reload Products
+                </button>
+              </div>
             ) : filteredProducts.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg">
-                <p className="text-gray-600 mb-4">No products found</p>
+                <p className="text-gray-600 mb-4">
+                  {searchQuery 
+                    ? `No products found for "${searchQuery}"` 
+                    : 'No products found'}
+                </p>
+                {searchQuery && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition mb-4"
+                  >
+                    Clear Search
+                  </button>
+                )}
                 <button
                   onClick={clearFilters}
                   className="text-primary-600 hover:text-primary-700 font-medium"

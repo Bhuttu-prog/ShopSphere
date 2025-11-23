@@ -44,6 +44,32 @@ public class DataSeederService implements CommandLineRunner {
         orderRepository.deleteAll();
         // Then delete associations and products
         associationRepository.deleteAll();
+        
+        // Delete specific products by ID before clearing all
+        List<Long> productsToDelete = List.of(6788L, 6807L, 6817L, 6905L, 7091L, 7092L, 7100L, 7260L);
+        for (Long productId : productsToDelete) {
+            try {
+                productRepository.findById(productId).ifPresent(product -> {
+                    // Delete associations where this product is the main product
+                    List<ProductAssociation> associations = associationRepository.findByProductId(productId);
+                    associationRepository.deleteAll(associations);
+                    
+                    // Delete associations where this product is the associated product
+                    List<ProductAssociation> reverseAssociations = associationRepository.findAll().stream()
+                        .filter(pa -> pa.getAssociatedProduct() != null && pa.getAssociatedProduct().getId().equals(productId))
+                        .collect(java.util.stream.Collectors.toList());
+                    associationRepository.deleteAll(reverseAssociations);
+                    
+                    // Delete the product
+                    productRepository.delete(product);
+                    System.out.println("Deleted product with ID: " + productId);
+                });
+            } catch (Exception e) {
+                // Product might not exist, continue
+                System.out.println("Product with ID " + productId + " not found or already deleted: " + e.getMessage());
+            }
+        }
+        
         productRepository.deleteAll();
         seedProducts();
     }
@@ -77,16 +103,12 @@ public class DataSeederService implements CommandLineRunner {
             "https://images.unsplash.com/photo-1630513094903-3fcaa1bcffd3?w=500&h=500&fit=crop&auto=format",
             "Electronics", 48, 4.8, 115));
         
-        allProducts.add(createProduct("iPhone 15 Pro Max - Natural Titanium", 
-            "Latest iPhone Pro Max with A17 Pro chip, 6.7-inch Super Retina XDR display, Pro camera system with 48MP main camera, Natural Titanium finish", 
-            new BigDecimal("1199.99"), 
-            "https://images.unsplash.com/photo-1544244015-0df4b3a78725?w=500&h=500&fit=crop",
-            "Electronics", 35, 4.9, 95));
+        // iPhone 15 Pro Max - Natural Titanium REMOVED (ID: 6788)
         
         allProducts.add(createProduct("Samsung Galaxy S24 Ultra", 
             "Flagship Android smartphone with 6.8-inch Dynamic AMOLED display, 200MP camera, S Pen support", 
             new BigDecimal("1199.99"), 
-            "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=500&h=500&fit=crop&auto=format",
+            "https://images.unsplash.com/photo-1705585174953-9b2aa8afc174?w=500&h=500&fit=crop&auto=format",
             "Electronics", 40, 4.7, 95));
         
         allProducts.add(createProduct("OnePlus 12", 
@@ -99,19 +121,19 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("MacBook Pro 16\" M3", 
             "M3 Pro chip, 16GB RAM, 512GB SSD, Liquid Retina XDR display, 22-hour battery life", 
             new BigDecimal("2499.99"), 
-            "https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1659135890084-930731031f40?w=500&h=500&fit=crop&auto=format",
             "Electronics", 30, 4.9, 85));
         
         allProducts.add(createProduct("Dell XPS 15", 
             "Intel i7-13700H, 16GB RAM, 1TB SSD, 15.6-inch 4K OLED touchscreen, NVIDIA RTX 4050", 
             new BigDecimal("1899.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=500&h=500&fit=crop&auto=format",
             "Electronics", 25, 4.6, 70));
         
         allProducts.add(createProduct("HP Spectre x360", 
             "Intel i7, 16GB RAM, 512GB SSD, 13.5-inch 3K OLED touchscreen, 2-in-1 convertible", 
             new BigDecimal("1399.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1658312226966-29bd4e77c62c?w=500&h=500&fit=crop&auto=format",
             "Electronics", 20, 4.5, 65));
         
         // ========== CLOTHING ==========
@@ -194,25 +216,21 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("Smart Watch", 
             "Fitness tracking smartwatch, heart rate monitor, GPS, water resistant, 7-day battery", 
             new BigDecimal("199.99"), 
-            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1549486862-1a0e849380d8?w=500&h=500&fit=crop&auto=format",
             "Accessories", 80, 4.7, 180));
         
-        allProducts.add(createProduct("Phone Case - Clear", 
-            "Protective clear case, shock absorption, raised edges, wireless charging compatible", 
-            new BigDecimal("24.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 300, 4.5, 250));
+        // Phone Case - Clear REMOVED (ID: 6807)
         
         allProducts.add(createProduct("USB-C Fast Charging Cable", 
             "6ft braided cable, 3A fast charging, data transfer, durable design, multiple device support", 
             new BigDecimal("19.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1573868388390-2739872961e6?w=500&h=500&fit=crop&auto=format",
             "Accessories", 500, 4.6, 400));
         
         allProducts.add(createProduct("Wireless Charging Pad", 
             "15W fast wireless charger, LED indicator, non-slip surface, compatible with all Qi devices", 
             new BigDecimal("39.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1633381638729-27f730955c23?w=500&h=500&fit=crop&auto=format",
             "Accessories", 150, 4.7, 220));
         
         allProducts.add(createProduct("Laptop Backpack", 
@@ -256,14 +274,10 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("Dumbbell Set", 
             "Adjustable dumbbell set, 5-50 lbs per dumbbell, compact design, perfect for home gym", 
             new BigDecimal("149.99"), 
-            "https://images.unsplash.com/photo-1571019613454-1cb2f99b84d4?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=500&h=500&fit=crop&auto=format",
             "Sports", 40, 4.7, 95));
         
-        allProducts.add(createProduct("Resistance Bands Set", 
-            "5-piece resistance bands set, multiple resistance levels, perfect for home workouts and travel", 
-            new BigDecimal("24.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Sports", 80, 4.6, 120));
+        // Resistance Bands Set REMOVED (ID: 6817)
         
         allProducts.add(createProduct("Running Shoes - Men", 
             "Lightweight running shoes with cushioned sole, breathable mesh, perfect for jogging and daily runs", 
@@ -281,13 +295,13 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("iPad Pro 12.9\"", 
             "M2 chip, 12.9-inch Liquid Retina XDR display, 128GB storage, supports Apple Pencil and Magic Keyboard", 
             new BigDecimal("1099.99"), 
-            "https://images.unsplash.com/photo-1544244015-0df4b3a78725?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1661340272675-f6829791246e?w=500&h=500&fit=crop&auto=format",
             "Electronics", 25, 4.8, 95));
         
         allProducts.add(createProduct("Sony WH-1000XM5 Headphones", 
             "Premium noise-canceling headphones, 30-hour battery, quick charge, exceptional sound quality", 
             new BigDecimal("399.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1583305727488-61f82c7eae4b?w=500&h=500&fit=crop&auto=format",
             "Electronics", 45, 4.9, 180));
         
         allProducts.add(createProduct("Gaming Monitor 27\" 4K", 
@@ -299,97 +313,55 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("Webcam HD 1080p", 
             "Full HD 1080p webcam, auto-focus, built-in microphone, perfect for video calls and streaming", 
             new BigDecimal("79.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1636569826709-8e07f6104992?w=500&h=500&fit=crop&auto=format",
             "Electronics", 150, 4.5, 250));
         
-        allProducts.add(createProduct("External SSD 1TB", 
-            "1TB portable SSD, USB-C 3.2, fast transfer speeds up to 1050MB/s, compact and durable", 
-            new BigDecimal("129.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 80, 4.6, 140));
-        
         // ========== MORE ACCESSORIES ==========
-        allProducts.add(createProduct("Screen Protector - Tempered Glass", 
-            "Premium tempered glass screen protector, 9H hardness, bubble-free installation, crystal clear", 
-            new BigDecimal("14.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 400, 4.4, 300));
-        
         allProducts.add(createProduct("Car Phone Mount", 
             "Magnetic car phone mount, 360° rotation, strong magnetic grip, easy installation, universal fit", 
             new BigDecimal("19.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1619463061549-e14e1de6c14f?w=500&h=500&fit=crop&auto=format",
             "Accessories", 200, 4.5, 180));
         
         allProducts.add(createProduct("Power Bank 20000mAh", 
             "High capacity power bank, 20000mAh, fast charging, dual USB ports, LED indicator, compact design", 
             new BigDecimal("39.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1600577231598-31ea4cb50da3?w=500&h=500&fit=crop&auto=format",
             "Accessories", 120, 4.6, 200));
         
         allProducts.add(createProduct("Laptop Stand Aluminum", 
             "Ergonomic aluminum laptop stand, adjustable height, improves posture, fits all laptop sizes", 
             new BigDecimal("49.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1575399545768-5f1840c1312d?w=500&h=500&fit=crop&auto=format",
             "Accessories", 90, 4.5, 150));
         
         // ========== MORE HOME & KITCHEN ==========
         allProducts.add(createProduct("Air Fryer 5.5QT", 
             "Large capacity air fryer, 5.5-quart, digital display, 7 cooking presets, non-stick basket", 
             new BigDecimal("89.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1617775047746-5b36a40109f5?w=500&h=500&fit=crop&auto=format",
             "Home & Kitchen", 55, 4.6, 170));
         
         allProducts.add(createProduct("Stand Mixer", 
             "5-quart stand mixer, 10-speed settings, includes dough hook, whisk, and paddle attachments", 
             new BigDecimal("299.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1693875161668-5c4ae0f2bf20?w=500&h=500&fit=crop&auto=format",
             "Home & Kitchen", 35, 4.8, 95));
         
         allProducts.add(createProduct("Bedding Set - Queen", 
             "Premium cotton bedding set, includes comforter, sheets, pillowcases, soft and breathable", 
             new BigDecimal("79.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1609587639086-b4cbf85e4355?w=500&h=500&fit=crop&auto=format",
             "Home & Kitchen", 70, 4.5, 140));
         
         allProducts.add(createProduct("Robot Vacuum Cleaner", 
             "Smart robot vacuum, Wi-Fi enabled, app control, auto-docking, works on carpets and hard floors", 
             new BigDecimal("249.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1558317374-067fb5f30001?w=500&h=500&fit=crop&auto=format",
             "Home & Kitchen", 40, 4.7, 120));
         
         // ========== MORE CLOTHING ==========
-        allProducts.add(createProduct("Winter Jacket - Men", 
-            "Warm winter jacket, water-resistant, insulated, multiple pockets, perfect for cold weather", 
-            new BigDecimal("149.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 50, 4.6, 110));
-        
-        allProducts.add(createProduct("Sneakers - Women", 
-            "Comfortable women's sneakers, cushioned insole, breathable upper, perfect for daily wear", 
-            new BigDecimal("69.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 85, 4.5, 160));
-        
-        allProducts.add(createProduct("Sunglasses - Aviator", 
-            "Classic aviator sunglasses, UV400 protection, polarized lenses, metal frame, unisex design", 
-            new BigDecimal("39.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 150, 4.4, 200));
-        
-        allProducts.add(createProduct("Wristwatch - Classic", 
-            "Classic analog wristwatch, leather strap, water-resistant, elegant design, perfect for daily wear", 
-            new BigDecimal("89.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 100, 4.6, 140));
-        
         // ========== MORE BEAUTY ==========
-        allProducts.add(createProduct("Makeup Brush Set", 
-            "12-piece professional makeup brush set, synthetic bristles, soft and durable, perfect for all makeup looks", 
-            new BigDecimal("34.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 110, 4.5, 180));
-        
         allProducts.add(createProduct("Hair Dryer Professional", 
             "Professional hair dryer, 1875W, multiple heat settings, ionic technology, reduces frizz", 
             new BigDecimal("59.99"), 
@@ -397,278 +369,44 @@ public class DataSeederService implements CommandLineRunner {
             "Beauty", 75, 4.6, 150));
         
         // ========== 10+ MORE ELECTRONICS ==========
-        allProducts.add(createProduct("Nintendo Switch OLED", 
-            "7-inch OLED screen, enhanced audio, 64GB internal storage, detachable Joy-Con controllers", 
-            new BigDecimal("349.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 60, 4.8, 200));
-        
-        allProducts.add(createProduct("DJI Mini 4 Pro Drone", 
-            "4K camera drone, 3-axis gimbal, obstacle avoidance, 34-minute flight time, compact design", 
-            new BigDecimal("759.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 25, 4.9, 95));
-        
         allProducts.add(createProduct("Amazon Echo Dot 5th Gen", 
             "Smart speaker with Alexa, improved sound quality, temperature sensor, privacy controls", 
             new BigDecimal("49.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1544451256-d79e9e199fa8?w=500&h=500&fit=crop&auto=format",
             "Electronics", 150, 4.6, 300));
-        
-        allProducts.add(createProduct("Ring Video Doorbell Pro", 
-            "1080p HD video doorbell, motion detection, two-way talk, night vision, works with Alexa", 
-            new BigDecimal("249.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 80, 4.7, 180));
-        
-        allProducts.add(createProduct("Fitbit Charge 6", 
-            "Advanced fitness tracker, heart rate monitor, GPS, sleep tracking, 7-day battery life", 
-            new BigDecimal("159.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 120, 4.5, 250));
-        
-        allProducts.add(createProduct("Canon EOS R6 Mark II", 
-            "24.2MP full-frame mirrorless camera, 4K video, in-body stabilization, dual pixel autofocus", 
-            new BigDecimal("2499.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 15, 4.9, 65));
-        
-        allProducts.add(createProduct("Oculus Quest 3 VR Headset", 
-            "Mixed reality VR headset, 128GB storage, hand tracking, wireless, immersive gaming", 
-            new BigDecimal("499.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 40, 4.7, 120));
-        
-        allProducts.add(createProduct("Sonos Beam Soundbar", 
-            "Compact smart soundbar, Dolby Atmos, voice control, works with Alexa and Google Assistant", 
-            new BigDecimal("449.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 50, 4.8, 140));
-        
-        allProducts.add(createProduct("Raspberry Pi 5", 
-            "Single board computer, 4GB RAM, dual 4K display support, faster CPU, perfect for projects", 
-            new BigDecimal("80.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 100, 4.6, 200));
-        
-        allProducts.add(createProduct("Anker 737 Power Bank", 
-            "24,000mAh power bank, 140W fast charging, USB-C PD, digital display, GaN technology", 
-            new BigDecimal("149.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 70, 4.7, 160));
-        
-        allProducts.add(createProduct("Logitech C920 HD Webcam", 
-            "1080p HD webcam, autofocus, stereo audio, privacy shutter, perfect for streaming", 
-            new BigDecimal("79.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Electronics", 90, 4.5, 220));
         
         allProducts.add(createProduct("Kindle Paperwhite", 
             "6.8-inch e-reader, waterproof, adjustable warm light, 8GB storage, weeks of battery", 
             new BigDecimal("139.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1623751370867-159020187c16?w=500&h=500&fit=crop&auto=format",
             "Electronics", 110, 4.8, 280));
         
         // ========== 10+ MORE CLOTHING ==========
         allProducts.add(createProduct("Hooded Sweatshirt - Gray", 
             "Comfortable cotton blend hoodie, front pocket, adjustable drawstring, perfect for casual wear", 
             new BigDecimal("44.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1580159851546-833dd8f26318?w=500&h=500&fit=crop&auto=format",
             "Clothing", 130, 4.5, 190));
-        
-        allProducts.add(createProduct("Chino Pants - Khaki", 
-            "Classic chino pants, 98% cotton 2% elastane, slim fit, versatile for office or casual", 
-            new BigDecimal("54.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 95, 4.4, 170));
-        
-        allProducts.add(createProduct("Wool Coat - Black", 
-            "Classic wool overcoat, double-breasted, warm lining, perfect for winter, elegant design", 
-            new BigDecimal("249.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 35, 4.7, 85));
-        
-        allProducts.add(createProduct("Polo Shirt - Navy Blue", 
-            "Classic polo shirt, 100% cotton pique, three-button placket, perfect for business casual", 
-            new BigDecimal("34.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 140, 4.5, 210));
-        
-        allProducts.add(createProduct("Leather Boots - Brown", 
-            "Genuine leather boots, cushioned insole, durable sole, perfect for outdoor activities", 
-            new BigDecimal("129.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 65, 4.6, 130));
-        
-        allProducts.add(createProduct("Maxi Dress - Floral Print", 
-            "Elegant maxi dress, flowy fabric, comfortable fit, perfect for summer events and parties", 
-            new BigDecimal("49.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 110, 4.6, 195));
-        
-        allProducts.add(createProduct("Blazer - Navy Blue", 
-            "Classic navy blazer, tailored fit, two-button, perfect for professional or formal occasions", 
-            new BigDecimal("179.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 45, 4.7, 100));
-        
-        allProducts.add(createProduct("Athletic Shorts - Black", 
-            "Moisture-wicking athletic shorts, elastic waistband, side pockets, perfect for workouts", 
-            new BigDecimal("29.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 160, 4.5, 240));
-        
-        allProducts.add(createProduct("Cardigan - Beige", 
-            "Soft cardigan sweater, button-up front, comfortable fit, perfect for layering", 
-            new BigDecimal("59.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 75, 4.5, 155));
-        
-        allProducts.add(createProduct("Ankle Boots - Black", 
-            "Stylish ankle boots, low heel, comfortable padding, perfect for everyday wear", 
-            new BigDecimal("79.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 70, 4.6, 145));
         
         allProducts.add(createProduct("Trench Coat - Beige", 
             "Classic trench coat, water-resistant, belted waist, timeless design, perfect for spring/fall", 
             new BigDecimal("199.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1633821879282-0c4e91f96232?w=500&h=500&fit=crop&auto=format",
             "Clothing", 40, 4.8, 90));
-        
-        allProducts.add(createProduct("Baseball Cap - Black", 
-            "Classic baseball cap, adjustable strap, breathable fabric, perfect for sun protection", 
-            new BigDecimal("19.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Clothing", 200, 4.4, 300));
         
         allProducts.add(createProduct("Scarf - Cashmere", 
             "Luxury cashmere scarf, soft and warm, elegant design, perfect accessory for winter", 
             new BigDecimal("89.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1674768015404-7aabcf6e9066?w=500&h=500&fit=crop&auto=format",
             "Clothing", 55, 4.7, 115));
         
         // ========== 10+ MORE HOME & KITCHEN ==========
-        allProducts.add(createProduct("Instant Pot Duo 7-in-1", 
-            "7-in-1 pressure cooker, slow cooker, rice cooker, steamer, sauté pan, yogurt maker, warmer", 
-            new BigDecimal("99.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 65, 4.8, 250));
-        
-        allProducts.add(createProduct("KitchenAid Stand Mixer 5QT", 
-            "5-quart stand mixer, 10 speeds, includes dough hook, flat beater, and wire whip", 
-            new BigDecimal("379.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 30, 4.9, 110));
-        
-        allProducts.add(createProduct("Dyson V15 Detect Vacuum", 
-            "Cordless vacuum cleaner, laser technology, HEPA filtration, 60-minute runtime", 
-            new BigDecimal("749.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 20, 4.8, 75));
-        
-        allProducts.add(createProduct("Nespresso Vertuo Coffee Machine", 
-            "Single-serve coffee machine, makes espresso and coffee, milk frother included", 
-            new BigDecimal("199.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 50, 4.7, 180));
-        
-        allProducts.add(createProduct("Ninja Foodi 8-in-1", 
-            "8-in-1 pressure cooker and air fryer, 6.5-quart capacity, digital display", 
-            new BigDecimal("199.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 45, 4.7, 165));
-        
-        allProducts.add(createProduct("Le Creuset Dutch Oven 5.5QT", 
-            "Enameled cast iron Dutch oven, even heat distribution, perfect for braising and baking", 
-            new BigDecimal("349.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 25, 4.9, 95));
-        
-        allProducts.add(createProduct("Vitamix 5200 Blender", 
-            "Professional-grade blender, 64-ounce container, variable speed control, self-cleaning", 
-            new BigDecimal("449.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 35, 4.8, 120));
-        
-        allProducts.add(createProduct("Shark Robot Vacuum RV1001AE", 
-            "Self-emptying robot vacuum, Wi-Fi connected, mapping technology, works on all floors", 
-            new BigDecimal("399.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 38, 4.7, 105));
-        
-        allProducts.add(createProduct("Kitchen Knife Set 8-Piece", 
-            "Professional knife set, stainless steel, ergonomic handles, includes block and sharpener", 
-            new BigDecimal("129.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 60, 4.6, 200));
-        
-        allProducts.add(createProduct("Bamboo Cutting Board Set", 
-            "3-piece bamboo cutting board set, eco-friendly, knife-friendly surface, easy to clean", 
-            new BigDecimal("39.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 100, 4.5, 280));
-        
-        allProducts.add(createProduct("KitchenAid Toaster 4-Slice", 
-            "Stainless steel toaster, 4-slice capacity, bagel and defrost settings, extra-wide slots", 
-            new BigDecimal("149.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 55, 4.6, 190));
-        
-        allProducts.add(createProduct("Dyson Pure Cool Air Purifier", 
-            "HEPA air purifier, removes 99.97% of allergens, 10-speed settings, Wi-Fi enabled", 
-            new BigDecimal("549.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 28, 4.8, 88));
-        
-        allProducts.add(createProduct("Cuisinart Food Processor 14-Cup", 
-            "Large capacity food processor, multiple blades, dough blade, slicing and shredding discs", 
-            new BigDecimal("199.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 42, 4.7, 150));
-        
-        allProducts.add(createProduct("Kitchen Scale Digital", 
-            "Precision digital kitchen scale, 11lb capacity, LCD display, tare function, battery included", 
-            new BigDecimal("24.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Home & Kitchen", 120, 4.5, 320));
-        
         // ========== 10+ MORE ACCESSORIES ==========
         allProducts.add(createProduct("Apple AirPods Pro 2", 
             "Active noise cancellation, spatial audio, adaptive EQ, MagSafe charging case, 30-hour battery", 
             new BigDecimal("249.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1593716686443-b821ac2a45c8?w=500&h=500&fit=crop&auto=format",
             "Accessories", 180, 4.9, 400));
-        
-        allProducts.add(createProduct("Samsung Galaxy Watch 6", 
-            "Advanced health monitoring, sleep tracking, GPS, 40-hour battery, swim-proof design", 
-            new BigDecimal("299.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 70, 4.7, 195));
-        
-        allProducts.add(createProduct("Ray-Ban Aviator Sunglasses", 
-            "Classic aviator sunglasses, polarized lenses, UV protection, metal frame, timeless design", 
-            new BigDecimal("154.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 95, 4.8, 220));
-        
-        allProducts.add(createProduct("Apple MagSafe Charger", 
-            "Magnetic wireless charger, 15W fast charging, compatible with iPhone 12 and later", 
-            new BigDecimal("39.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 250, 4.6, 350));
-        
-        allProducts.add(createProduct("Anker 3-in-1 Charging Station", 
-            "Wireless charging station for iPhone, AirPods, and Apple Watch, compact design", 
-            new BigDecimal("89.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 110, 4.7, 240));
-        
-        allProducts.add(createProduct("Belkin BoostCharge Pro", 
-            "3-in-1 MagSafe charger, fast charging for iPhone, AirPods, and Apple Watch", 
-            new BigDecimal("149.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 85, 4.8, 210));
         
         allProducts.add(createProduct("Logitech MX Master 3S Mouse", 
             "Ergonomic wireless mouse, precision tracking, multi-device connectivity, 70-day battery", 
@@ -682,127 +420,15 @@ public class DataSeederService implements CommandLineRunner {
             "https://images.unsplash.com/photo-1541140532154-b024d705b90a?w=500&h=500&fit=crop",
             "Accessories", 105, 4.7, 260));
         
-        allProducts.add(createProduct("HyperX Cloud II Gaming Headset", 
-            "7.1 surround sound, noise-canceling microphone, memory foam ear cushions, durable build", 
-            new BigDecimal("99.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 140, 4.6, 300));
-        
-        allProducts.add(createProduct("DJI Osmo Mobile 6 Gimbal", 
-            "3-axis smartphone gimbal, active tracking, gesture control, perfect for video creation", 
-            new BigDecimal("159.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 60, 4.7, 175));
-        
-        allProducts.add(createProduct("Anker 313 Wireless Charger", 
-            "10W wireless charger, LED indicator, non-slip surface, compatible with all Qi devices", 
-            new BigDecimal("19.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 320, 4.5, 450));
-        
-        allProducts.add(createProduct("Spigen Tough Armor Phone Case", 
-            "Rugged phone case, dual-layer protection, kickstand, wireless charging compatible", 
-            new BigDecimal("34.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 280, 4.6, 380));
-        
-        allProducts.add(createProduct("Nomad Base Station Pro", 
-            "3-in-1 wireless charger, MagSafe compatible, charges iPhone, AirPods, and Apple Watch", 
-            new BigDecimal("149.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Accessories", 75, 4.8, 200));
-        
         // ========== 10+ MORE BEAUTY ==========
-        allProducts.add(createProduct("L'Oreal Paris Revitalift Serum", 
-            "Anti-aging serum with hyaluronic acid, reduces fine lines, brightens skin, 1.0 fl oz", 
-            new BigDecimal("24.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 180, 4.6, 350));
-        
-        allProducts.add(createProduct("CeraVe Moisturizing Cream", 
-            "Daily moisturizing cream, hyaluronic acid, ceramides, suitable for dry skin, 19 oz", 
-            new BigDecimal("19.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 200, 4.7, 420));
-        
-        allProducts.add(createProduct("Maybelline Mascara Volum' Express", 
-            "Lengthening and volumizing mascara, clump-free formula, waterproof, black color", 
-            new BigDecimal("9.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 250, 4.5, 500));
-        
-        allProducts.add(createProduct("Neutrogena Ultra Gentle Cleanser", 
-            "Daily facial cleanser, fragrance-free, hypoallergenic, suitable for sensitive skin, 12 fl oz", 
-            new BigDecimal("10.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 220, 4.6, 480));
-        
-        allProducts.add(createProduct("The Ordinary Niacinamide 10%", 
-            "High-strength niacinamide serum, reduces blemishes, minimizes pores, 1 fl oz", 
-            new BigDecimal("6.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 190, 4.8, 400));
-        
-        allProducts.add(createProduct("Olaplex No.3 Hair Perfector", 
-            "Hair treatment, repairs damaged hair, strengthens bonds, 3.3 fl oz", 
-            new BigDecimal("28.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 120, 4.9, 280));
-        
-        allProducts.add(createProduct("Fenty Beauty Pro Filt'r Foundation", 
-            "Longwear matte foundation, 50 shades, buildable coverage, oil-free, 1 fl oz", 
-            new BigDecimal("38.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 95, 4.7, 240));
-        
         allProducts.add(createProduct("Dyson Supersonic Hair Dryer", 
             "Professional hair dryer, intelligent heat control, fast drying, reduces heat damage", 
             new BigDecimal("429.99"), 
             "https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=500&h=500&fit=crop",
             "Beauty", 35, 4.9, 120));
         
-        allProducts.add(createProduct("Charlotte Tilbury Pillow Talk Lipstick", 
-            "Matte lipstick, long-lasting, hydrating formula, iconic nude-pink shade", 
-            new BigDecimal("35.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 110, 4.8, 260));
-        
-        allProducts.add(createProduct("Anastasia Beverly Hills Brow Wiz", 
-            "Precision brow pencil, dual-ended with spoolie, waterproof, multiple shades", 
-            new BigDecimal("24.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 160, 4.7, 320));
-        
-        allProducts.add(createProduct("La Mer Crème de la Mer", 
-            "Luxury moisturizing cream, miracle broth, rich texture, 1 oz", 
-            new BigDecimal("195.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 25, 4.9, 85));
-        
-        allProducts.add(createProduct("Tatcha The Water Cream", 
-            "Oil-free moisturizer, Japanese ingredients, lightweight, perfect for combination skin, 1.7 oz", 
-            new BigDecimal("68.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 70, 4.8, 180));
-        
-        allProducts.add(createProduct("Glossier Boy Brow", 
-            "Tinted brow gel, volumizing, natural finish, easy application, multiple shades", 
-            new BigDecimal("18.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 200, 4.6, 380));
-        
-        allProducts.add(createProduct("Drunk Elephant C-Firma Serum", 
-            "Vitamin C day serum, brightens skin, reduces dark spots, 1 fl oz", 
-            new BigDecimal("80.00"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Beauty", 80, 4.7, 200));
-        
         // ========== 10+ MORE SPORTS ==========
-        allProducts.add(createProduct("Adjustable Weight Bench", 
-            "Multi-position weight bench, adjustable backrest, sturdy construction, perfect for home gym", 
-            new BigDecimal("199.99"), 
-            "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=500&fit=crop",
-            "Sports", 30, 4.7, 110));
+        // Adjustable Weight Bench REMOVED (ID: 6905)
         
         allProducts.add(createProduct("Pull-Up Bar Doorway", 
             "Doorway pull-up bar, no drilling required, multiple grip positions, supports up to 300 lbs", 
@@ -879,7 +505,7 @@ public class DataSeederService implements CommandLineRunner {
         allProducts.add(createProduct("Exercise Bike - Stationary", 
             "Magnetic resistance exercise bike, LCD display, adjustable seat, perfect for home cardio", 
             new BigDecimal("299.99"), 
-            "https://unsplash.com/photos/2pqPojBNq0Y/download?w=500&h=500&fit=crop",
+            "https://images.unsplash.com/photo-1707985287164-c84627ad6eba?w=500&h=500&fit=crop&auto=format",
             "Sports", 20, 4.7, 80));
         
         // Save all products

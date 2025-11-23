@@ -101,9 +101,16 @@ export const fetchFrequentlyBoughtTogether = createAsyncThunk(
 
 export const searchProducts = createAsyncThunk(
   'products/search',
-  async (query: string) => {
-    const response = await axios.get(`${API_URL}/products/search?q=${query}`);
-    return response.data;
+  async (query: string, { rejectWithValue }) => {
+    try {
+      const encodedQuery = encodeURIComponent(query);
+      const response = await axios.get(`${API_URL}/products/search?q=${encodedQuery}`);
+      console.log('searchProducts: Search results:', response.data?.length || 0, 'products');
+      return response.data;
+    } catch (error: any) {
+      console.error('searchProducts: Error searching products:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to search products');
+    }
   }
 );
 
@@ -161,6 +168,20 @@ const productSlice = createSlice({
       })
       .addCase(fetchFrequentlyBoughtTogether.rejected, (state) => {
         state.frequentlyBoughtTogether = [];
+      })
+      .addCase(searchProducts.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(searchProducts.fulfilled, (state, action) => {
+        state.loading = false;
+        state.products = action.payload;
+        state.error = null;
+      })
+      .addCase(searchProducts.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to search products';
+        state.products = []; // Clear products on search error
       });
   },
 });
