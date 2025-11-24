@@ -104,11 +104,8 @@ const Payment: React.FC = () => {
         paymentId: `PAY_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       };
 
-      const response = await axios.post('http://localhost:8080/api/orders', orderData, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      // Axios interceptor handles auth headers automatically
+      const response = await axios.post('http://localhost:8080/api/orders', orderData);
 
       if (response.status === 200 && response.data) {
         dispatch(clearCart());
@@ -121,7 +118,14 @@ const Payment: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Payment error:', error);
-      toast.error(error.response?.data?.error || 'Payment failed. Please try again.');
+      
+      // Don't navigate to login - axios interceptor handles auth
+      // Only show error message
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Payment failed. Please try again.';
+      toast.error(errorMessage);
       setProcessing(false);
     }
   };

@@ -47,8 +47,11 @@ public class ReviewService {
             throw new RuntimeException("You have already reviewed this product");
         }
         
-        // Check if user has purchased this product (for verified purchase badge)
+        // Check if user has purchased and received this product (must be DELIVERED)
         boolean hasPurchased = hasUserPurchasedProduct(userId, productId);
+        if (!hasPurchased) {
+            throw new RuntimeException("You can only review products that have been delivered to you");
+        }
         
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
@@ -137,25 +140,25 @@ public class ReviewService {
     }
     
     public boolean canUserReview(Long userId, Long productId) {
-        // User can review if they haven't reviewed yet AND they have purchased the product
+        // User can review if they haven't reviewed yet AND they have purchased and received the product
         if (reviewRepository.findByUserIdAndProductId(userId, productId).isPresent()) {
             return false; // Already reviewed
         }
         
-        // Check if user has purchased this product (any order status, not just delivered)
+        // Check if user has purchased this product AND it has been DELIVERED
         List<Order> orders = orderRepository.findByUserId(userId);
         for (Order order : orders) {
-            // Allow review if order is not cancelled
-            if (order.getStatus() != Order.OrderStatus.CANCELLED) {
+            // Only allow review if order is DELIVERED
+            if (order.getStatus() == Order.OrderStatus.DELIVERED) {
                 for (OrderItem item : order.getOrderItems()) {
                     if (item.getProduct().getId().equals(productId)) {
-                        return true; // User has ordered this product
+                        return true; // User has received this product
                     }
                 }
             }
         }
         
-        return false; // User hasn't ordered this product
+        return false; // User hasn't received this product yet
     }
 }
 

@@ -55,15 +55,21 @@ const ProductDetailEnhanced: React.FC = () => {
       .slice(0, 4);
   }, [currentProduct, products]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!user) {
       toast.error('Please login to add items to cart');
       navigate('/login');
       return;
     }
     if (currentProduct) {
-      dispatch(addToCart({ userId, productId: currentProduct.id, quantity }));
-      toast.success(`Added ${quantity} item(s) to cart!`);
+      try {
+        await dispatch(addToCart({ userId, productId: currentProduct.id, quantity })).unwrap();
+        toast.success(`Added ${quantity} item(s) to cart!`);
+      } catch (error: any) {
+        const errorMessage = error || 'Failed to add item to cart';
+        toast.error(errorMessage);
+        // Don't navigate to login - let the error message handle it
+      }
     }
   };
 

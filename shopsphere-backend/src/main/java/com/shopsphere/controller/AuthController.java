@@ -3,6 +3,7 @@ package com.shopsphere.controller;
 import com.shopsphere.model.User;
 import com.shopsphere.repository.UserRepository;
 import com.shopsphere.service.AuthService;
+import com.shopsphere.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +25,9 @@ public class AuthController {
     
     @Autowired
     private PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    private JwtUtil jwtUtil;
     
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Map<String, String> request) {
@@ -126,6 +130,57 @@ public class AuthController {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to fetch profile: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @GetMapping("/validate")
+    public ResponseEntity<?> validateToken(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Authorization header required");
+                return ResponseEntity.status(401).body(error);
+            }
+            
+            String token = authHeader.substring(7);
+            
+            // Validate token
+            if (!jwtUtil.validateToken(token)) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Invalid or expired token");
+                return ResponseEntity.status(401).body(error);
+            }
+            
+            // Get user ID from token
+            Long userId = jwtUtil.getUserIdFromToken(token);
+            if (userId == null) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Invalid token");
+                return ResponseEntity.status(401).body(error);
+            }
+            
+            // Get user from database
+            Optional<User> userOpt = userRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "User not found");
+                return ResponseEntity.status(401).body(error);
+            }
+            
+            User user = userOpt.get();
+            Map<String, Object> response = new HashMap<>();
+            response.put("user", Map.of(
+                "id", user.getId(),
+                "email", user.getEmail(),
+                "firstName", user.getFirstName() != null ? user.getFirstName() : "",
+                "lastName", user.getLastName() != null ? user.getLastName() : ""
+            ));
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Token validation failed: " + e.getMessage());
+            return ResponseEntity.status(401).body(error);
         }
     }
 }

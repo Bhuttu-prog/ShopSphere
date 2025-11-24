@@ -10,11 +10,14 @@ import java.util.Optional;
 
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
-    List<Review> findByProductIdOrderByCreatedAtDesc(Long productId);
+    @Query("SELECT r FROM Review r WHERE r.product.id = :productId ORDER BY r.createdAt DESC")
+    List<Review> findByProductIdOrderByCreatedAtDesc(@Param("productId") Long productId);
     
-    List<Review> findByUserId(Long userId);
+    @Query("SELECT r FROM Review r WHERE r.user.id = :userId ORDER BY r.createdAt DESC")
+    List<Review> findByUserId(@Param("userId") Long userId);
     
-    Optional<Review> findByUserIdAndProductId(Long userId, Long productId);
+    @Query("SELECT r FROM Review r WHERE r.user.id = :userId AND r.product.id = :productId")
+    Optional<Review> findByUserIdAndProductId(@Param("userId") Long userId, @Param("productId") Long productId);
     
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.product.id = :productId")
     Double getAverageRatingByProductId(@Param("productId") Long productId);

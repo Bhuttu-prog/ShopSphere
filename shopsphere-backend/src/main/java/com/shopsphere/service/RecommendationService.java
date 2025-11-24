@@ -184,12 +184,18 @@ public class RecommendationService {
      * Get ML-based recommendations for a product
      * Combines collaborative filtering, content-based filtering, and association rules
      */
-    @Cacheable(value = "mlRecommendations", key = "#productId")
+    // Temporarily disable cache to ensure fresh recommendations
+    // @Cacheable(value = "mlRecommendations", key = "#productId")
     public List<Product> getRecommendations(Long productId) {
         // Verify product exists
-        if (!productRepository.existsById(productId)) {
+        Product currentProduct = productRepository.findById(productId).orElse(null);
+        if (currentProduct == null) {
             throw new RuntimeException("Product not found");
         }
+        
+        String currentCategory = currentProduct.getCategory() != null 
+            ? currentProduct.getCategory().trim().toLowerCase() 
+            : "";
         
         // Initialize models if empty
         if (coOccurrenceMatrix.isEmpty()) {
@@ -199,40 +205,278 @@ public class RecommendationService {
             buildSimilarityMatrix();
         }
         
-        // Combine scores from different ML approaches
+        // Helper method to check if two categories match (handles variations like "mens-shirts" and "clothing")
+        java.util.function.Function<String, Boolean> isSameCategory = (String cat) -> {
+            if (cat == null || currentCategory.isEmpty()) return false;
+            String normalizedCat = cat.trim().toLowerCase();
+            String normalizedCurrent = currentCategory.trim().toLowerCase();
+            
+            // Exact match
+            if (normalizedCat.equals(normalizedCurrent)) return true;
+            
+            // Handle variations: "mens-shirts", "mens-shoes", "mens-watches" all match "clothing"
+            if ((normalizedCurrent.contains("mens-") || normalizedCurrent.contains("clothing")) &&
+                (normalizedCat.contains("mens-") || normalizedCat.contains("clothing"))) {
+                return true;
+            }
+            
+            // Handle "clothing" matching any clothing subcategory
+            if (normalizedCurrent.equals("clothing") && 
+                (normalizedCat.contains("shirt") || normalizedCat.contains("shoe") || 
+                 normalizedCat.contains("watch") || normalizedCat.contains("pant") ||
+                 normalizedCat.contains("jeans") || normalizedCat.contains("dress") ||
+                 normalizedCat.contains("mens-"))) {
+                return true;
+            }
+            
+            // Handle reverse: clothing subcategories match "clothing"
+            if (normalizedCurrent.contains("mens-") && normalizedCat.equals("clothing")) {
+                return true;
+            }
+            
+            return false;
+        };
+        
+        // Helper method to check if category is related (e.g., clothing-related)
+        java.util.function.Function<String, Boolean> isRelatedCategory = (String cat) -> {
+            if (cat == null || currentCategory.isEmpty()) return false;
+            String normalizedCat = cat.trim().toLowerCase();
+            String normalizedCurrent = currentCategory.trim().toLowerCase();
+            
+            // If current is clothing-related, related categories are clothing, accessories (but NOT kitchen-accessories)
+            if (normalizedCurrent.contains("mens-") || normalizedCurrent.contains("clothing")) {
+                return (normalizedCat.contains("clothing") || normalizedCat.contains("mens-")) || 
+                       (normalizedCat.equals("accessories") && !normalizedCat.contains("kitchen"));
+            }
+            
+            // If current is electronics, related are electronics, accessories (but NOT kitchen-accessories)
+            if (normalizedCurrent.contains("electronics")) {
+                return normalizedCat.contains("electronics") || 
+                       (normalizedCat.equals("accessories") && !normalizedCat.contains("kitchen"));
+            }
+            
+            // If current is beauty, related are beauty, accessories (but NOT kitchen-accessories)
+            if (normalizedCurrent.contains("beauty")) {
+                return normalizedCat.contains("beauty") || 
+                       (normalizedCat.equals("accessories") && !normalizedCat.contains("kitchen"));
+            }
+            
+            // If current is home & kitchen, related are home & kitchen, kitchen-accessories
+            if (normalizedCurrent.contains("home") || normalizedCurrent.contains("kitchen")) {
+                return normalizedCat.contains("home") || normalizedCat.contains("kitchen");
+            }
+            
+            // If current is sports, related are sports, clothing, accessories (but NOT kitchen-accessories)
+            if (normalizedCurrent.contains("sports")) {
+                return normalizedCat.contains("sports") || normalizedCat.contains("clothing") || 
+                       (normalizedCat.equals("accessories") && !normalizedCat.contains("kitchen"));
+            }
+            
+            return false;
+        };
+        
+        // Combine scores from different ML approaches, but only for same/related category products
         Map<Long, Double> recommendationScores = new HashMap<>();
         
         // 1. Collaborative Filtering (50% weight) - Based on co-occurrence
         Map<Long, Double> coOccurrences = coOccurrenceMatrix.getOrDefault(productId, new HashMap<>());
         for (Map.Entry<Long, Double> entry : coOccurrences.entrySet()) {
             if (entry.getValue() >= MIN_SUPPORT) {
+                Product p = productRepository.findById(entry.getKey()).orElse(null);
+                if (p != null && !currentCategory.isEmpty()) {
+                    String cat = p.getCategory() != null ? p.getCategory() : "";
+                    // Only include if same or related category
+                    if (isSameCategory.apply(cat) || isRelatedCategory.apply(cat)) {
+                        recommendationScores.merge(entry.getKey(), entry.getValue() * 0.5, Double::sum);
+                    }
+                } else if (p != null && currentCategory.isEmpty()) {
+                    // If no category, include all
                 recommendationScores.merge(entry.getKey(), entry.getValue() * 0.5, Double::sum);
+                }
             }
         }
         
         // 2. Content-Based Filtering (30% weight) - Similar products
         Map<Long, Double> similarities = similarityMatrix.getOrDefault(productId, new HashMap<>());
         for (Map.Entry<Long, Double> entry : similarities.entrySet()) {
+            Product p = productRepository.findById(entry.getKey()).orElse(null);
+            if (p != null && !currentCategory.isEmpty()) {
+                String cat = p.getCategory() != null ? p.getCategory() : "";
+                // Only include if same or related category
+                if (isSameCategory.apply(cat) || isRelatedCategory.apply(cat)) {
+                    recommendationScores.merge(entry.getKey(), entry.getValue() * 0.3, Double::sum);
+                }
+            } else if (p != null && currentCategory.isEmpty()) {
+                // If no category, include all
             recommendationScores.merge(entry.getKey(), entry.getValue() * 0.3, Double::sum);
+            }
         }
         
         // 3. Association Rules (20% weight) - Find complementary products
         Map<Long, Double> associations = findAssociationRules(productId);
         for (Map.Entry<Long, Double> entry : associations.entrySet()) {
+            Product p = productRepository.findById(entry.getKey()).orElse(null);
+            if (p != null && !currentCategory.isEmpty()) {
+                String cat = p.getCategory() != null ? p.getCategory() : "";
+                // Only include if same or related category
+                if (isSameCategory.apply(cat) || isRelatedCategory.apply(cat)) {
+                    recommendationScores.merge(entry.getKey(), entry.getValue() * 0.2, Double::sum);
+                }
+            } else if (p != null && currentCategory.isEmpty()) {
+                // If no category, include all
             recommendationScores.merge(entry.getKey(), entry.getValue() * 0.2, Double::sum);
+            }
         }
         
-        // Filter and rank recommendations
-        return recommendationScores.entrySet().stream()
-            .filter(entry -> {
-                Product p = productRepository.findById(entry.getKey()).orElse(null);
-                return p != null && p.getStock() > 0 && !p.getId().equals(productId);
-            })
-            .sorted((e1, e2) -> Double.compare(e2.getValue(), e1.getValue()))
-            .limit(8)
-            .map(entry -> productRepository.findById(entry.getKey()).orElse(null))
-            .filter(Objects::nonNull)
+        // STRICT APPROACH: Show ONLY exact same-category products, exclude exact same product, limit to top 4
+        // Also exclude products with similar names (e.g., if viewing a watch, don't show other watches)
+        if (!currentCategory.isEmpty()) {
+            // Get all products in the EXACT same category (excluding the current product)
+            List<Product> allProducts = productRepository.findAll();
+            
+            // Extract key words from current product name to identify product type
+            String currentProductName = currentProduct.getName() != null ? currentProduct.getName().toLowerCase() : "";
+            String[] currentNameWords = currentProductName.split("\\s+");
+            java.util.Set<String> currentProductTypeWords = new java.util.HashSet<>();
+            for (String word : currentNameWords) {
+                if (word.length() > 3) { // Only meaningful words
+                    currentProductTypeWords.add(word);
+                }
+            }
+            
+            List<Product> sameCategoryProducts = allProducts.stream()
+                .filter(p -> {
+                    // Exclude the exact same product
+                    if (p.getId().equals(productId)) {
+                        return false;
+                    }
+                    // Only include products with stock
+                    if (p.getStock() == null || p.getStock() <= 0) {
+                        return false;
+                    }
+                    // STRICT: Only include exact same category (case-insensitive)
+                    String cat = p.getCategory() != null ? p.getCategory().trim() : "";
+                    String normalizedCat = cat.toLowerCase();
+                    String normalizedCurrent = currentCategory.toLowerCase();
+                    
+                    // Exact category match only - no special cases, no related categories
+                    if (!normalizedCat.equals(normalizedCurrent)) {
+                        return false;
+                    }
+                    
+                    // Exclude products with similar names (e.g., if viewing "watch", don't show other "watch" products)
+                    String productName = p.getName() != null ? p.getName().toLowerCase() : "";
+                    
+                    // Check for common product type keywords that indicate same product type
+                    String[] productTypeKeywords = {"watch", "shirt", "shoe", "sneaker", "sneakers", "boot", "boots", 
+                                                     "jordan", "cleat", "cleats", "trainer", "trainers",
+                                                     "jacket", "dress", "jeans", "pant", "pants", 
+                                                     "phone", "iphone", "samsung", "laptop", "tablet",
+                                                     "earbud", "earbuds", "headphone", "headphones", 
+                                                     "mouse", "keyboard", "monitor", "tv", "television", 
+                                                     "camera", "speaker", "charger", "cable"};
+                    
+                    // Check if both products contain the same product type keyword
+                    for (String keyword : productTypeKeywords) {
+                        boolean currentHasKeyword = currentProductName.contains(keyword);
+                        boolean productHasKeyword = productName.contains(keyword);
+                        
+                        // If both have the same keyword, they're likely the same product type - exclude
+                        if (currentHasKeyword && productHasKeyword) {
+                            return false;
+                        }
+                    }
+                    
+                    // Special case: Watch brands (Rolex, Longines, etc.) - if both are watch brands, exclude
+                    String[] watchBrands = {"rolex", "longines", "omega", "tag heuer", "breitling", "patek", "audemars"};
+                    boolean currentIsWatchBrand = false;
+                    boolean productIsWatchBrand = false;
+                    for (String brand : watchBrands) {
+                        if (currentProductName.contains(brand)) {
+                            currentIsWatchBrand = true;
+                        }
+                        if (productName.contains(brand)) {
+                            productIsWatchBrand = true;
+                        }
+                    }
+                    // If both are watch brands, they're both watches - exclude
+                    if (currentIsWatchBrand && productIsWatchBrand) {
+                        return false;
+                    }
+                    
+                    // Special case: if one has "jordan" and the other has "sneaker"/"shoe", they're both shoes
+                    if ((currentProductName.contains("jordan") && (productName.contains("sneaker") || productName.contains("shoe") || productName.contains("cleat") || productName.contains("trainer"))) ||
+                        (productName.contains("jordan") && (currentProductName.contains("sneaker") || currentProductName.contains("shoe") || currentProductName.contains("cleat") || currentProductName.contains("trainer")))) {
+                        return false;
+                    }
+                    
+                    // Also check for matching significant words (fallback)
+                    String[] productNameWords = productName.split("\\s+");
+                    long matchingWords = java.util.Arrays.stream(productNameWords)
+                        .filter(word -> word.length() > 3 && currentProductTypeWords.contains(word))
+                        .count();
+                    
+                    // If more than 2 matching words, it's likely the same product type
+                    if (matchingWords > 2) {
+                        return false;
+                    }
+                    
+                    return true;
+                })
+                .sorted((p1, p2) -> {
+                    // First, prioritize products with ML scores (if available)
+                    Double score1 = recommendationScores.get(p1.getId());
+                    Double score2 = recommendationScores.get(p2.getId());
+                    
+                    if (score1 != null && score2 != null) {
+                        return Double.compare(score2, score1); // Higher score first
+                    }
+                    if (score1 != null) return -1; // Products with scores first
+                    if (score2 != null) return 1;
+                    
+                    // Then, prioritize products similar to the current product (based on name/description keywords)
+                    String currentNameForSort = currentProduct.getName() != null ? currentProduct.getName().toLowerCase() : "";
+                    String currentDesc = currentProduct.getDescription() != null ? currentProduct.getDescription().toLowerCase() : "";
+                    String p1Name = p1.getName() != null ? p1.getName().toLowerCase() : "";
+                    String p1Desc = p1.getDescription() != null ? p1.getDescription().toLowerCase() : "";
+                    String p2Name = p2.getName() != null ? p2.getName().toLowerCase() : "";
+                    String p2Desc = p2.getDescription() != null ? p2.getDescription().toLowerCase() : "";
+                    
+                    // Extract keywords from current product
+                    String[] currentKeywords = (currentNameForSort + " " + currentDesc).split("\\s+");
+                    java.util.Set<String> currentKeywordSet = new java.util.HashSet<>();
+                    for (String kw : currentKeywords) {
+                        if (kw.length() > 3) { // Only meaningful words
+                            currentKeywordSet.add(kw);
+                        }
+                    }
+                    
+                    // Count matching keywords
+                    long p1Matches = java.util.Arrays.stream((p1Name + " " + p1Desc).split("\\s+"))
+                        .filter(kw -> kw.length() > 3 && currentKeywordSet.contains(kw))
+                        .count();
+                    long p2Matches = java.util.Arrays.stream((p2Name + " " + p2Desc).split("\\s+"))
+                        .filter(kw -> kw.length() > 3 && currentKeywordSet.contains(kw))
+                        .count();
+                    
+                    if (p1Matches != p2Matches) {
+                        return Long.compare(p2Matches, p1Matches); // More matches first
+                    }
+                    
+                    // Then sort by popularity (rating * reviewCount)
+                    double popularity1 = (p1.getRating() != null ? p1.getRating() : 0) * (p1.getReviewCount() != null ? p1.getReviewCount() : 0);
+                    double popularity2 = (p2.getRating() != null ? p2.getRating() : 0) * (p2.getReviewCount() != null ? p2.getReviewCount() : 0);
+                    return Double.compare(popularity2, popularity1);
+                })
+                .limit(4) // STRICT LIMIT: Only top 4 products
             .collect(Collectors.toList());
+            
+            // Return top 4 same-category products only
+            return sameCategoryProducts;
+        }
+        
+        // If no category, return empty list
+        return new ArrayList<>();
     }
     
     /**
@@ -287,341 +531,159 @@ public class RecommendationService {
     }
     
     /**
-     * Get frequently bought together products using ML
-     * Returns complementary products that are DIFFERENT from similar products (different category/configuration)
-     * Example: Phone -> Phone Cover, Data Cable (complementary, not similar phones)
+     * Get frequently bought together products - STRICT: Only same-category products
+     * Returns top 4 products from the exact same category (excluding the current product)
      */
-    @Cacheable(value = "mlFrequentlyBoughtTogether", key = "#productId")
+    // @Cacheable(value = "mlFrequentlyBoughtTogether", key = "#productId") // Disabled cache for testing
     public List<Product> getFrequentlyBoughtTogether(Long productId) {
         Product currentProduct = productRepository.findById(productId).orElse(null);
         if (currentProduct == null) {
             return new ArrayList<>();
         }
         
-        // Build co-occurrence matrix if empty
-        if (coOccurrenceMatrix.isEmpty()) {
-            buildCoOccurrenceMatrix();
-        }
-        
-        // Define complementary category mappings
-        // Categories that should show same-category items: clothing, beauty, home & kitchen, sports
-        // These categories have products that naturally go together (e.g., mattress + bedding, t-shirt + jeans)
-        Map<String, List<String>> complementaryCategories = new HashMap<>();
-        complementaryCategories.put("electronics", Arrays.asList("accessories")); // Electronics show accessories
-        complementaryCategories.put("clothing", Arrays.asList("clothing", "accessories")); // Allow same-category for clothing
-        complementaryCategories.put("home & kitchen", Arrays.asList("home & kitchen", "accessories")); // Allow same-category for home & kitchen
-        complementaryCategories.put("sports", Arrays.asList("sports", "accessories", "clothing")); // Allow same-category for sports
-        complementaryCategories.put("beauty", Arrays.asList("beauty", "accessories")); // Allow same-category for beauty
-        complementaryCategories.put("accessories", Arrays.asList("electronics", "clothing")); // Accessories show electronics/clothing
-        
         String currentCategory = currentProduct.getCategory() != null 
             ? currentProduct.getCategory().trim().toLowerCase() 
             : "";
         
-        // Categories that should show same-category items (products that naturally go together)
-        boolean allowSameCategory = "clothing".equals(currentCategory) || 
-                                   "beauty".equals(currentCategory) || 
-                                   "home & kitchen".equals(currentCategory) || 
-                                   "sports".equals(currentCategory);
+        if (currentCategory.isEmpty()) {
+            return new ArrayList<>();
+        }
         
-        List<String> preferredCategories = complementaryCategories.getOrDefault(currentCategory, 
-            Arrays.asList("accessories")); // Default to accessories if no mapping
+        // Build co-occurrence matrix if empty (for ML scores)
+        if (coOccurrenceMatrix.isEmpty()) {
+            buildCoOccurrenceMatrix();
+        }
+        
+        // Get ML scores for same-category products only
+        Map<Long, Double> mlScores = new HashMap<>();
+        Map<Long, Double> coOccurrences = coOccurrenceMatrix.getOrDefault(productId, new HashMap<>());
+        for (Map.Entry<Long, Double> entry : coOccurrences.entrySet()) {
+            if (entry.getValue() >= MIN_SUPPORT) {
+                Product p = productRepository.findById(entry.getKey()).orElse(null);
+                if (p != null) {
+                    String cat = p.getCategory() != null ? p.getCategory().trim().toLowerCase() : "";
+                    // Only include exact same category
+                    if (cat.equals(currentCategory)) {
+                        mlScores.put(entry.getKey(), entry.getValue());
+                    }
+                }
+            }
+        }
         
         List<Product> allProducts = productRepository.findAll();
         
-        // First, check for explicit product associations (highest priority)
-        List<ProductAssociation> associations = associationRepository.findTopAssociationsByProductId(productId);
-        if (!associations.isEmpty()) {
-            // For beauty/clothing, prioritize same-category associations
-            if (allowSameCategory) {
-                List<Product> sameCategoryAssociations = associations.stream()
-                    .filter(assoc -> assoc.getAssociatedProduct() != null)
-                    .filter(assoc -> assoc.getType() == ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER || 
-                                    assoc.getType() == ProductAssociation.AssociationType.COMPLEMENTARY)
-                    .filter(assoc -> {
-                        Product p = assoc.getAssociatedProduct();
-                        return p.getStock() != null && p.getStock() > 0 && !p.getId().equals(productId);
-                    })
-                    .filter(assoc -> {
-                        Product p = assoc.getAssociatedProduct();
-                        if (p.getCategory() != null && !currentCategory.isEmpty()) {
-                            return p.getCategory().trim().toLowerCase().equals(currentCategory);
-                        }
-                        return false;
-                    })
-                    .sorted((a1, a2) -> Double.compare(
-                        a2.getAssociationStrength() != null ? a2.getAssociationStrength() : 0.0,
-                        a1.getAssociationStrength() != null ? a1.getAssociationStrength() : 0.0))
-                    .limit(6)
-                    .map(ProductAssociation::getAssociatedProduct)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-                
-                if (sameCategoryAssociations.size() >= 3) {
-                    return sameCategoryAssociations;
-                }
-            }
-            
-            // Otherwise, get all associations (for non-beauty/clothing, or if not enough same-category)
-            List<Product> fromAssociations = associations.stream()
-                .filter(assoc -> assoc.getAssociatedProduct() != null)
-                .filter(assoc -> assoc.getType() == ProductAssociation.AssociationType.FREQUENTLY_BOUGHT_TOGETHER || 
-                                assoc.getType() == ProductAssociation.AssociationType.COMPLEMENTARY)
-                .filter(assoc -> {
-                    Product p = assoc.getAssociatedProduct();
-                    return p.getStock() != null && p.getStock() > 0 && !p.getId().equals(productId);
-                })
-                .filter(assoc -> {
-                    // For clothing and beauty, allow same-category items
-                    // For other categories, apply category filtering if needed
-                    if (allowSameCategory) {
-                        return true; // Allow all for clothing and beauty (we already checked same-category above)
-                    }
-                    Product p = assoc.getAssociatedProduct();
-                    if (p.getCategory() != null && !currentCategory.isEmpty()) {
-                        return !p.getCategory().trim().toLowerCase().equals(currentCategory);
-                    }
-                    return true;
-                })
-                .sorted((a1, a2) -> {
-                    // For beauty/clothing, prioritize same-category
-                    if (allowSameCategory) {
-                        Product p1 = a1.getAssociatedProduct();
-                        Product p2 = a2.getAssociatedProduct();
-                        boolean p1SameCategory = p1 != null && p1.getCategory() != null && 
-                                p1.getCategory().trim().toLowerCase().equals(currentCategory);
-                        boolean p2SameCategory = p2 != null && p2.getCategory() != null && 
-                                p2.getCategory().trim().toLowerCase().equals(currentCategory);
-                        if (p1SameCategory != p2SameCategory) {
-                            return p1SameCategory ? -1 : 1;
-                        }
-                    }
-                    // Then by strength
-                    return Double.compare(
-                        a2.getAssociationStrength() != null ? a2.getAssociationStrength() : 0.0,
-                        a1.getAssociationStrength() != null ? a1.getAssociationStrength() : 0.0);
-                })
-                .limit(6)
-                .map(ProductAssociation::getAssociatedProduct)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-            
-            // For categories that allow same-category, only return if we have enough same-category items
-            if (!fromAssociations.isEmpty()) {
-                if (allowSameCategory) {
-                    long sameCategoryCount = fromAssociations.stream()
-                        .filter(p -> p.getCategory() != null && 
-                                p.getCategory().trim().toLowerCase().equals(currentCategory))
-                        .count();
-                    // Only return if we have at least 3 same-category items
-                    // Otherwise, skip associations and fall through to fallback which will prioritize same-category
-                    if (sameCategoryCount >= 3) {
-                        return fromAssociations;
-                    }
-                    // Don't return associations if we don't have enough same-category items
-                    // Fall through to fallback which will find same-category products
-                } else {
-                    return fromAssociations;
-                }
-            }
-        }
-        
-        // Second, try to get from co-occurrence matrix (ML-based)
-        final boolean finalAllowSameCategory = allowSameCategory;
-        final String finalCurrentCategoryForML = currentCategory;
-        
-        // For clothing and beauty, prioritize same-category items from ML
-        if (finalAllowSameCategory) {
-            List<Product> sameCategoryFromML = coOccurrenceMatrix.getOrDefault(productId, new HashMap<>()).entrySet().stream()
-                .filter(entry -> entry.getValue() >= MIN_SUPPORT)
-                .sorted((e1, e2) -> Double.compare(e2.getValue(), e1.getValue()))
-                .map(entry -> productRepository.findById(entry.getKey()).orElse(null))
-                .filter(Objects::nonNull)
-                .filter(p -> p.getStock() != null && p.getStock() > 0)
-                .filter(p -> !p.getId().equals(productId))
-                .filter(p -> {
-                    if (p.getCategory() != null && !finalCurrentCategoryForML.isEmpty()) {
-                        return p.getCategory().trim().toLowerCase().equals(finalCurrentCategoryForML);
-                    }
-                    return false;
-                })
-                .limit(6)
-                .collect(Collectors.toList());
-            
-            // If we have enough same-category items from ML, return them
-            if (sameCategoryFromML.size() >= 3) {
-                return sameCategoryFromML;
-            }
-        }
-        
-        // Otherwise, get all ML results (including complementary categories)
-        List<Product> fromML = coOccurrenceMatrix.getOrDefault(productId, new HashMap<>()).entrySet().stream()
-            .filter(entry -> entry.getValue() >= MIN_SUPPORT)
-            .sorted((e1, e2) -> Double.compare(e2.getValue(), e1.getValue()))
-            .map(entry -> productRepository.findById(entry.getKey()).orElse(null))
-            .filter(Objects::nonNull)
-            .filter(p -> p.getStock() != null && p.getStock() > 0)
-            .filter(p -> !p.getId().equals(productId))
-            .filter(p -> {
-                // For clothing and beauty, allow same-category items
-                // For other categories, exclude same-category items
-                if (p.getCategory() != null && !finalCurrentCategoryForML.isEmpty()) {
-                    String productCategory = p.getCategory().trim().toLowerCase();
-                    if (finalAllowSameCategory) {
-                        // For clothing and beauty, prioritize same-category items
-                        return productCategory.equals(finalCurrentCategoryForML) || 
-                               preferredCategories.contains(productCategory);
-                    } else {
-                        // For other categories, exclude same-category items
-                        return !productCategory.equals(finalCurrentCategoryForML);
-                    }
-                }
-                return true;
-            })
-            .sorted((p1, p2) -> {
-                // Prioritize same-category items
-                if (finalAllowSameCategory) {
-                    String cat1 = p1.getCategory() != null ? p1.getCategory().trim().toLowerCase() : "";
-                    String cat2 = p2.getCategory() != null ? p2.getCategory().trim().toLowerCase() : "";
-                    boolean p1SameCategory = cat1.equals(finalCurrentCategoryForML);
-                    boolean p2SameCategory = cat2.equals(finalCurrentCategoryForML);
-                    if (p1SameCategory != p2SameCategory) {
-                        return p1SameCategory ? -1 : 1;
-                    }
-                }
-                return 0;
-            })
-            .limit(6)
-            .collect(Collectors.toList());
-        
-        // If we have ML results, check if they're appropriate
-        // For categories that allow same-category, skip ML if it doesn't have same-category items
-        if (!fromML.isEmpty()) {
-            if (!finalAllowSameCategory) {
-                // For categories that don't allow same-category, return ML results as-is
-                return fromML;
-            } else {
-                // For categories that allow same-category, check if ML has same-category items
-                long sameCategoryCount = fromML.stream()
-                    .filter(p -> p.getCategory() != null && 
-                            p.getCategory().trim().toLowerCase().equals(finalCurrentCategoryForML))
-                    .count();
-                // Only return ML if we have at least 3 same-category items
-                // Otherwise, fall through to fallback which will prioritize same-category
-                if (sameCategoryCount >= 3) {
-                    return fromML;
-                }
-                // Fall through to fallback for better same-category prioritization
-            }
-        }
-        
-        // Fallback: Get products from complementary categories
+        // STRICT: Get ONLY same-category products (exact match, no related categories)
+        // Also exclude products with similar names (e.g., if viewing a watch, don't show other watches)
         final String finalCurrentCategory = currentCategory;
-        final List<String> finalPreferredCategories = preferredCategories;
-        final boolean finalAllowSameCategoryFallback = allowSameCategory;
+        final Map<Long, Double> finalMlScores = mlScores;
         
-        // First, get same-category products if allowed
-        List<Product> sameCategoryProducts = new ArrayList<>();
-        if (finalAllowSameCategoryFallback) {
-            sameCategoryProducts = allProducts.stream()
-                .filter(Objects::nonNull)
-                .filter(p -> p.getStock() != null && p.getStock() > 0)
-                .filter(p -> !p.getId().equals(productId))
-                .filter(p -> {
-                    if (p.getCategory() != null && !finalCurrentCategory.isEmpty()) {
-                        String productCategory = p.getCategory().trim().toLowerCase();
-                        return productCategory.equals(finalCurrentCategory);
-                    }
-                    return false;
-                })
-                .sorted((p1, p2) -> {
-                    // Sort by popularity
-                    double score1 = (p1.getRating() != null ? p1.getRating() : 0) * (p1.getReviewCount() != null ? p1.getReviewCount() : 0);
-                    double score2 = (p2.getRating() != null ? p2.getRating() : 0) * (p2.getReviewCount() != null ? p2.getReviewCount() : 0);
-                    return Double.compare(score2, score1);
-                })
-                .limit(6)
-                .collect(Collectors.toList());
-            
-            // For categories that allow same-category, return same-category products if we have any
-            if (!sameCategoryProducts.isEmpty()) {
-                return sameCategoryProducts.stream().limit(6).collect(Collectors.toList());
+        // Extract key words from current product name to identify product type
+        String currentProductName = currentProduct.getName() != null ? currentProduct.getName().toLowerCase() : "";
+        String[] currentNameWords = currentProductName.split("\\s+");
+        java.util.Set<String> currentProductTypeWords = new java.util.HashSet<>();
+        for (String word : currentNameWords) {
+            if (word.length() > 3) { // Only meaningful words
+                currentProductTypeWords.add(word);
             }
         }
         
-        // Otherwise, include complementary categories
-        List<Product> frequentlyBought = allProducts.stream()
+        List<Product> sameCategoryProducts = allProducts.stream()
             .filter(Objects::nonNull)
-            .filter(p -> p.getStock() != null && p.getStock() > 0)
-            .filter(p -> !p.getId().equals(productId))
             .filter(p -> {
-                if (p.getCategory() != null && !finalCurrentCategory.isEmpty()) {
-                    String productCategory = p.getCategory().trim().toLowerCase();
-                    if (finalAllowSameCategoryFallback) {
-                        // For categories that allow same-category, prioritize same-category items
-                        // Include same-category first, then complementary categories
-                        return productCategory.equals(finalCurrentCategory) || 
-                               finalPreferredCategories.contains(productCategory);
-                    } else {
-                        // For other categories, exclude same-category items
-                        if (productCategory.equals(finalCurrentCategory)) {
-                            return false;
-                        }
-                        // Prioritize preferred complementary categories
-                        return finalPreferredCategories.contains(productCategory) || 
-                               !productCategory.equals(finalCurrentCategory);
+                // Exclude the exact same product
+                if (p.getId().equals(productId)) {
+                    return false;
+                }
+                // Only include products with stock
+                if (p.getStock() == null || p.getStock() <= 0) {
+                    return false;
+                }
+                // STRICT: Only exact same category (case-insensitive)
+                String cat = p.getCategory() != null ? p.getCategory().trim().toLowerCase() : "";
+                if (!cat.equals(finalCurrentCategory)) {
+                    return false;
+                }
+                
+                // Exclude products with similar names (e.g., if viewing "watch", don't show other "watch" products)
+                String productName = p.getName() != null ? p.getName().toLowerCase() : "";
+                
+                // Check for common product type keywords that indicate same product type
+                String[] productTypeKeywords = {"watch", "shirt", "shoe", "sneaker", "sneakers", "boot", "boots", 
+                                                 "jordan", "cleat", "cleats", "trainer", "trainers",
+                                                 "jacket", "dress", "jeans", "pant", "pants", 
+                                                 "phone", "iphone", "samsung", "laptop", "tablet",
+                                                 "earbud", "earbuds", "headphone", "headphones", 
+                                                 "mouse", "keyboard", "monitor", "tv", "television", 
+                                                 "camera", "speaker", "charger", "cable"};
+                
+                // Check if both products contain the same product type keyword
+                for (String keyword : productTypeKeywords) {
+                    boolean currentHasKeyword = currentProductName.contains(keyword);
+                    boolean productHasKeyword = productName.contains(keyword);
+                    
+                    // If both have the same keyword, they're likely the same product type - exclude
+                    if (currentHasKeyword && productHasKeyword) {
+                        return false;
                     }
                 }
+                
+                // Special case: Watch brands (Rolex, Longines, etc.) - if both are watch brands, exclude
+                String[] watchBrands = {"rolex", "longines", "omega", "tag heuer", "breitling", "patek", "audemars"};
+                boolean currentIsWatchBrand = false;
+                boolean productIsWatchBrand = false;
+                for (String brand : watchBrands) {
+                    if (currentProductName.contains(brand)) {
+                        currentIsWatchBrand = true;
+                    }
+                    if (productName.contains(brand)) {
+                        productIsWatchBrand = true;
+                    }
+                }
+                // If both are watch brands, they're both watches - exclude
+                if (currentIsWatchBrand && productIsWatchBrand) {
+                    return false;
+                }
+                
+                // Special case: if one has "jordan" and the other has "sneaker"/"shoe", they're both shoes
+                if ((currentProductName.contains("jordan") && (productName.contains("sneaker") || productName.contains("shoe") || productName.contains("cleat") || productName.contains("trainer"))) ||
+                    (productName.contains("jordan") && (currentProductName.contains("sneaker") || currentProductName.contains("shoe") || currentProductName.contains("cleat") || currentProductName.contains("trainer")))) {
+                    return false;
+                }
+                
+                // Also check for matching significant words (fallback)
+                String[] productNameWords = productName.split("\\s+");
+                long matchingWords = java.util.Arrays.stream(productNameWords)
+                    .filter(word -> word.length() > 3 && currentProductTypeWords.contains(word))
+                    .count();
+                
+                // If more than 2 matching words, it's likely the same product type
+                if (matchingWords > 2) {
+                    return false;
+                }
+                
                 return true;
             })
             .sorted((p1, p2) -> {
-                // Score products: for categories that allow same-category, prioritize same-category items first
-                String cat1 = p1.getCategory() != null ? p1.getCategory().trim().toLowerCase() : "";
-                String cat2 = p2.getCategory() != null ? p2.getCategory().trim().toLowerCase() : "";
+                // First, prioritize products with ML scores (if available)
+                Double score1 = finalMlScores.get(p1.getId());
+                Double score2 = finalMlScores.get(p2.getId());
                 
-                if (finalAllowSameCategoryFallback) {
-                    // For categories that allow same-category: same-category items first, then preferred categories
-                    boolean p1SameCategory = cat1.equals(finalCurrentCategory);
-                    boolean p2SameCategory = cat2.equals(finalCurrentCategory);
-                    
-                    if (p1SameCategory != p2SameCategory) {
-                        return p1SameCategory ? -1 : 1; // Same-category items first
-                    }
+                if (score1 != null && score2 != null) {
+                    return Double.compare(score2, score1); // Higher score first
                 }
+                if (score1 != null) return -1; // Products with scores first
+                if (score2 != null) return 1;
                 
-                boolean p1Preferred = finalPreferredCategories.contains(cat1);
-                boolean p2Preferred = finalPreferredCategories.contains(cat2);
-                
-                if (p1Preferred != p2Preferred) {
-                    return p1Preferred ? -1 : 1; // Preferred categories first
-                }
-                
-                // Then sort by popularity
-                double score1 = (p1.getRating() != null ? p1.getRating() : 0) * (p1.getReviewCount() != null ? p1.getReviewCount() : 0);
-                double score2 = (p2.getRating() != null ? p2.getRating() : 0) * (p2.getReviewCount() != null ? p2.getReviewCount() : 0);
-                return Double.compare(score2, score1);
+                // Then sort by popularity (rating * reviewCount)
+                double popularity1 = (p1.getRating() != null ? p1.getRating() : 0) * (p1.getReviewCount() != null ? p1.getReviewCount() : 0);
+                double popularity2 = (p2.getRating() != null ? p2.getRating() : 0) * (p2.getReviewCount() != null ? p2.getReviewCount() : 0);
+                return Double.compare(popularity2, popularity1);
             })
-            .limit(6)
+            .limit(4) // STRICT LIMIT: Only top 4 products
             .collect(Collectors.toList());
         
-        // If we have same-category products and allow same-category, combine them with complementary
-        if (finalAllowSameCategoryFallback && !sameCategoryProducts.isEmpty()) {
-            // Combine same-category with complementary, prioritizing same-category
-            List<Product> combined = new ArrayList<>(sameCategoryProducts);
-            Set<Long> sameCategoryIds = sameCategoryProducts.stream()
-                .map(Product::getId)
-                .collect(Collectors.toSet());
-            
-            // Add complementary products that aren't already in same-category list
-            for (Product p : frequentlyBought) {
-                if (!sameCategoryIds.contains(p.getId()) && combined.size() < 6) {
-                    combined.add(p);
-                }
-            }
-            return combined.stream().limit(6).collect(Collectors.toList());
-        }
-        
-        return frequentlyBought;
+        // Return top 4 same-category products only
+        return sameCategoryProducts;
     }
     
     /**

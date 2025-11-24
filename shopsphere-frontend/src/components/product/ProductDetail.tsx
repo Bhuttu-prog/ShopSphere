@@ -25,9 +25,15 @@ const ProductDetail: React.FC = () => {
     }
   }, [id, dispatch]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (currentProduct) {
-      dispatch(addToCart({ userId, productId: currentProduct.id, quantity: 1 }));
+      try {
+        await dispatch(addToCart({ userId, productId: currentProduct.id, quantity: 1 })).unwrap();
+      } catch (error: any) {
+        const errorMessage = error || 'Failed to add item to cart';
+        console.error('Error adding to cart:', errorMessage);
+        // Error is handled by the cart slice, no need to show toast here
+      }
     }
   };
 

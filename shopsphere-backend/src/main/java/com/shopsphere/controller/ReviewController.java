@@ -164,7 +164,7 @@ public class ReviewController {
                     .anyMatch(r -> r.getProductId().equals(productId))) {
                     response.put("reason", "You have already reviewed this product");
                 } else {
-                    response.put("reason", "Please purchase this product to write a review");
+                    response.put("reason", "You can only review products that have been delivered to you");
                 }
             }
             return ResponseEntity.ok(response);

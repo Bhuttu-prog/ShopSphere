@@ -11,6 +11,7 @@ import java.util.List;
 public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByCategory(String category);
     List<Product> findByNameContainingIgnoreCase(String name);
+    java.util.Optional<Product> findByName(String name);
     
     @Query("SELECT p FROM Product p WHERE p.stock > 0 ORDER BY p.rating DESC")
     List<Product> findTopRatedProducts();

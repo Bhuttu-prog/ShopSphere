@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAppSelector } from '../hooks/redux';
+import { useAppSelector, useAppDispatch } from '../hooks/redux';
+import { restoreAuth } from '../store/slices/authSlice';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { formatPrice } from '../utils/currency';
@@ -29,10 +30,12 @@ interface Order {
 
 const Orders: React.FC = () => {
   const { user, isAuthenticated } = useAppSelector(state => state.auth);
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authRestoring, setAuthRestoring] = useState(false);
   const retryCountRef = useRef(0);
   const maxRetries = 5;
 
@@ -51,20 +54,14 @@ const Orders: React.FC = () => {
       let response;
       try {
         console.log('Trying /my-orders endpoint (uses JWT token)...');
-        response = await axios.get(`http://localhost:8080/api/orders/my-orders`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
+        // Axios interceptor handles auth headers automatically
+        response = await axios.get(`http://localhost:8080/api/orders/my-orders`);
         console.log('Successfully used /my-orders endpoint');
       } catch (myOrdersError: any) {
         console.warn('my-orders endpoint failed, trying user/{id} endpoint...', myOrdersError.response?.data);
         // Fallback to the original endpoint
-        response = await axios.get(`http://localhost:8080/api/orders/user/${user?.id}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
+        // Axios interceptor handles auth headers automatically
+        response = await axios.get(`http://localhost:8080/api/orders/user/${user?.id}`);
       }
       
       console.log('Orders API response status:', response.status);
@@ -111,23 +108,61 @@ const Orders: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    const token = localStorage.getItem('token');
+    
+    // If no token at all, redirect to login
+    if (!token) {
       navigate('/login');
       return;
     }
 
-    // Reset retry count when component mounts or location changes
-    retryCountRef.current = 0;
-    
-    // Initial fetch with delay to ensure order is committed (especially after checkout)
-    const timer = setTimeout(() => {
-      fetchOrders(500);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [user?.id, isAuthenticated, navigate, location.pathname]);
+    // If we have a token but not authenticated, try to restore auth
+    if (!isAuthenticated && token && !authRestoring) {
+      setAuthRestoring(true);
+      dispatch(restoreAuth())
+        .then((result: any) => {
+          setAuthRestoring(false);
+          // Don't redirect even if restoration failed - token might still be valid
+          // Let the user continue with their session
+        })
+        .catch(() => {
+          setAuthRestoring(false);
+          // Don't redirect - keep the session active
+        });
+      return;
+    }
 
-  if (!isAuthenticated) {
+    // If auth is still restoring, wait
+    if (authRestoring) {
+      return;
+    }
+
+    // If authenticated, proceed with fetching orders
+    if (isAuthenticated) {
+      // Reset retry count when component mounts or location changes
+      retryCountRef.current = 0;
+      
+      // Initial fetch with delay to ensure order is committed (especially after checkout)
+      const timer = setTimeout(() => {
+        fetchOrders(500);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user?.id, isAuthenticated, navigate, location.pathname, dispatch, authRestoring]);
+
+  // Show loading while restoring auth or if not authenticated yet
+  const token = localStorage.getItem('token');
+  if (authRestoring || (!isAuthenticated && token)) {
+    return (
+      <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-12 text-center max-w-[98%] xl:max-w-[95%]">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // If no token and not authenticated, return null (will redirect in useEffect)
+  if (!isAuthenticated && !token) {
     return null;
   }
 

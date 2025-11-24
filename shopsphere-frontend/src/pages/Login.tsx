@@ -24,6 +24,8 @@ const Login: React.FC = () => {
 
       dispatch(setToken(response.data.token));
       dispatch(setUser(response.data.user));
+      // Also save user to localStorage as backup
+      localStorage.setItem('user', JSON.stringify(response.data.user));
       toast.success('Login successful!');
       navigate('/');
     } catch (error: any) {

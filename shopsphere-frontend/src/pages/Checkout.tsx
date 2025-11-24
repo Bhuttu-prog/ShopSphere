@@ -27,11 +27,8 @@ const Checkout: React.FC = () => {
     const loadSavedAddress = async () => {
       if (user?.id) {
         try {
-          const response = await axios.get(`http://localhost:8080/api/auth/profile/${user.id}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-          });
+          // Axios interceptor handles auth headers automatically
+          const response = await axios.get(`http://localhost:8080/api/auth/profile/${user.id}`);
           
           if (response.data) {
             setFormData(prev => ({
@@ -139,11 +136,8 @@ const Checkout: React.FC = () => {
     // For Cash on Delivery, place order directly
     if (formData.paymentMethod === 'cod') {
       try {
-        const response = await axios.post('http://localhost:8080/api/orders', orderData, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
+        // Axios interceptor handles auth headers automatically
+        const response = await axios.post('http://localhost:8080/api/orders', orderData);
 
         if (response.status === 200 && response.data) {
           dispatch(clearCart());
@@ -156,6 +150,9 @@ const Checkout: React.FC = () => {
         }
       } catch (error: any) {
         console.error('Order placement error:', error);
+        
+        // Don't navigate to login - axios interceptor handles auth
+        // Only show error message
         const errorMessage = error.response?.data?.error || 
                             error.response?.data?.message || 
                             error.message || 

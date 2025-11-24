@@ -7,6 +7,7 @@ import com.shopsphere.repository.ProductAssociationRepository;
 import com.shopsphere.repository.CartRepository;
 import com.shopsphere.repository.OrderRepository;
 import com.shopsphere.repository.WishlistRepository;
+import com.shopsphere.repository.ReviewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -34,44 +35,60 @@ public class DataSeederService implements CommandLineRunner {
     @Autowired
     private WishlistRepository wishlistRepository;
     
+    @Autowired
+    private ReviewRepository reviewRepository;
+    
     @Override
-    @Transactional
     public void run(String... args) {
-        // Clear existing data in correct order to avoid foreign key constraint violations
-        // Delete cart items, wishlist, and orders first (they reference products)
-        cartRepository.deleteAll();
-        wishlistRepository.deleteAll();
-        orderRepository.deleteAll();
-        // Then delete associations and products
-        associationRepository.deleteAll();
-        
-        // Delete specific products by ID before clearing all
-        List<Long> productsToDelete = List.of(6788L, 6807L, 6817L, 6905L, 7091L, 7092L, 7100L, 7260L);
-        for (Long productId : productsToDelete) {
-            try {
-                productRepository.findById(productId).ifPresent(product -> {
-                    // Delete associations where this product is the main product
-                    List<ProductAssociation> associations = associationRepository.findByProductId(productId);
-                    associationRepository.deleteAll(associations);
-                    
-                    // Delete associations where this product is the associated product
-                    List<ProductAssociation> reverseAssociations = associationRepository.findAll().stream()
-                        .filter(pa -> pa.getAssociatedProduct() != null && pa.getAssociatedProduct().getId().equals(productId))
-                        .collect(java.util.stream.Collectors.toList());
-                    associationRepository.deleteAll(reverseAssociations);
-                    
-                    // Delete the product
-                    productRepository.delete(product);
-                    System.out.println("Deleted product with ID: " + productId);
-                });
-            } catch (Exception e) {
-                // Product might not exist, continue
-                System.out.println("Product with ID " + productId + " not found or already deleted: " + e.getMessage());
+        try {
+            // Check if products already exist
+            long productCount = productRepository.count();
+            if (productCount > 0) {
+                System.out.println("Products already exist (" + productCount + "), skipping data seeding.");
+                return;
             }
+            
+            // Clear existing data in correct order to avoid foreign key constraint violations
+            // Delete cart items, wishlist, orders, and reviews first (they reference products)
+            cartRepository.deleteAll();
+            wishlistRepository.deleteAll();
+            orderRepository.deleteAll();
+            reviewRepository.deleteAll(); // Delete reviews before products
+            // Then delete associations and products
+            associationRepository.deleteAll();
+            
+            // Delete specific products by ID before clearing all
+            List<Long> productsToDelete = List.of(6788L, 6807L, 6817L, 6905L, 7091L, 7092L, 7100L, 7260L);
+            for (Long productId : productsToDelete) {
+                try {
+                    productRepository.findById(productId).ifPresent(product -> {
+                        // Delete associations where this product is the main product
+                        List<ProductAssociation> associations = associationRepository.findByProductId(productId);
+                        associationRepository.deleteAll(associations);
+                        
+                        // Delete associations where this product is the associated product
+                        List<ProductAssociation> reverseAssociations = associationRepository.findAll().stream()
+                            .filter(pa -> pa.getAssociatedProduct() != null && pa.getAssociatedProduct().getId().equals(productId))
+                            .collect(java.util.stream.Collectors.toList());
+                        associationRepository.deleteAll(reverseAssociations);
+                        
+                        // Delete the product
+                        productRepository.delete(product);
+                        System.out.println("Deleted product with ID: " + productId);
+                    });
+                } catch (Exception e) {
+                    // Product might not exist, continue
+                    System.out.println("Product with ID " + productId + " not found or already deleted: " + e.getMessage());
+                }
+            }
+            
+            productRepository.deleteAll();
+            seedProducts();
+        } catch (Exception e) {
+            System.err.println("Error during data seeding: " + e.getMessage());
+            e.printStackTrace();
+            // Don't throw - allow app to continue starting
         }
-        
-        productRepository.deleteAll();
-        seedProducts();
     }
     
     private void seedProducts() {

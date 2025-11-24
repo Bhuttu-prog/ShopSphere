@@ -30,19 +30,27 @@ const initialState: CartState = {
 
 export const fetchCart = createAsyncThunk(
   'cart/fetch',
-  async (userId: number) => {
-    const response = await axios.get(`${API_URL}/cart/${userId}`);
-    return response.data;
+  async (userId: number, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_URL}/cart/${userId}`);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
   }
 );
 
 export const addToCart = createAsyncThunk(
   'cart/add',
-  async ({ userId, productId, quantity }: { userId: number; productId: number; quantity: number }) => {
-    const response = await axios.post(
-      `${API_URL}/cart/${userId}/add?productId=${productId}&quantity=${quantity}`
-    );
-    return response.data;
+  async ({ userId, productId, quantity }: { userId: number; productId: number; quantity: number }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/cart/${userId}/add?productId=${productId}&quantity=${quantity}`
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
   }
 );
 
@@ -63,9 +71,13 @@ export const updateCartQuantity = createAsyncThunk(
 
 export const removeFromCart = createAsyncThunk(
   'cart/remove',
-  async ({ userId, productId }: { userId: number; productId: number }) => {
-    await axios.delete(`${API_URL}/cart/${userId}/remove/${productId}`);
-    return productId;
+  async ({ userId, productId }: { userId: number; productId: number }, { rejectWithValue }) => {
+    try {
+      await axios.delete(`${API_URL}/cart/${userId}/remove/${productId}`);
+      return productId;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
   }
 );
 
@@ -83,14 +95,20 @@ const cartSlice = createSlice({
         state.items = action.payload;
       })
       .addCase(addToCart.fulfilled, (state, action) => {
-        const existingItem = state.items.find(
-          item => item.product.id === action.payload.product.id
-        );
-        if (existingItem) {
-          existingItem.quantity = action.payload.quantity;
-        } else {
-          state.items.push(action.payload);
+        if (action.payload && action.payload.product) {
+          const existingItem = state.items.find(
+            item => item.product.id === action.payload.product.id
+          );
+          if (existingItem) {
+            existingItem.quantity = action.payload.quantity;
+          } else {
+            state.items.push(action.payload);
+          }
         }
+      })
+      .addCase(addToCart.rejected, (state, action) => {
+        console.error('addToCart.rejected:', action.error, action.payload);
+        state.error = action.payload as string || 'Failed to add item to cart';
       })
       .addCase(updateCartQuantity.fulfilled, (state, action) => {
         console.log('updateCartQuantity.fulfilled:', action.payload);

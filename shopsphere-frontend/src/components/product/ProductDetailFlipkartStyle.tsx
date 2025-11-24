@@ -91,45 +91,43 @@ const ProductDetailFlipkartStyle: React.FC = () => {
       .slice(0, 8);
   }, [currentProduct, products]);
 
-  // Filter frequently bought together to exclude similar products (ensure they're complementary)
+  // Use frequently bought together products directly
+  // Since both recommendations and frequentlyBoughtTogether now show same-category products,
+  // we'll show frequentlyBoughtTogether as a separate section (even if there's some overlap with similarProducts)
   const complementaryProducts = useMemo(() => {
     if (!currentProduct || frequentlyBoughtTogether.length === 0) return frequentlyBoughtTogether;
     
-    // Get similar product IDs to exclude
+    // Get similar product IDs to exclude (to minimize duplicates between sections)
     const similarProductIds = new Set(similarProducts.map(p => p.id));
     
-    // Categories that should show same-category items (products that naturally go together)
-    // e.g., t-shirt + jeans, hair treatment + shampoo, mattress + bedding, running shoes + workout clothes
-    const currentCategory = currentProduct.category?.toLowerCase();
-    const allowSameCategory = currentCategory === 'clothing' || 
-                              currentCategory === 'beauty' || 
-                              currentCategory === 'home & kitchen' || 
-                              currentCategory === 'sports';
+    // Filter out products that are already shown in similar products to avoid duplicates
+    // But if all products are filtered out, show at least some from frequentlyBoughtTogether
+    const filtered = frequentlyBoughtTogether.filter(product => !similarProductIds.has(product.id));
     
-    // Filter out any products that are in similar products list
-    return frequentlyBoughtTogether.filter(product => {
-      // Exclude if it's in similar products
-      if (similarProductIds.has(product.id)) return false;
-      
-      // For categories that allow same-category, allow same-category items (they are complementary)
-      // For other categories, exclude same-category items (they should be complementary from different categories)
-      if (!allowSameCategory && product.category === currentProduct.category) {
-        return false;
-      }
-      
-      return true;
-    });
+    // If all products were filtered out (all overlap with similarProducts), 
+    // show the first few from frequentlyBoughtTogether anyway
+    if (filtered.length === 0 && frequentlyBoughtTogether.length > 0) {
+      return frequentlyBoughtTogether.slice(0, 4);
+    }
+    
+    return filtered;
   }, [frequentlyBoughtTogether, similarProducts, currentProduct]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!user) {
       toast.error('Please login to add items to cart');
       navigate('/login');
       return;
     }
     if (currentProduct) {
-      dispatch(addToCart({ userId, productId: currentProduct.id, quantity }));
-      toast.success(`Added ${quantity} item(s) to cart!`);
+      try {
+        await dispatch(addToCart({ userId, productId: currentProduct.id, quantity })).unwrap();
+        toast.success(`Added ${quantity} item(s) to cart!`);
+      } catch (error: any) {
+        const errorMessage = error || 'Failed to add item to cart';
+        toast.error(errorMessage);
+        // Don't navigate to login - let the error message handle it
+      }
     }
   };
 

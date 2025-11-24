@@ -4,6 +4,7 @@ import { Product } from '../../store/slices/productSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { addToCart } from '../../store/slices/cartSlice';
 import { addToWishlist, removeFromWishlist, checkWishlistStatus } from '../../store/slices/wishlistSlice';
+import { restoreAuth } from '../../store/slices/authSlice';
 import { toast } from 'react-hot-toast';
 import { ShoppingCartIcon, HeartIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
@@ -59,15 +60,41 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     navigate(`/products/${product.id}`, { replace: false });
   };
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) {
+    const token = localStorage.getItem('token');
+    
+    // If no token, redirect to login
+    if (!token) {
       toast.error('Please login to add items to cart');
       navigate('/login');
       return;
     }
-    dispatch(addToCart({ userId: user.id, productId: product.id, quantity: 1 }));
-    toast.success('Added to cart!');
+    
+    // Use user ID from Redux, or try to get it from token
+    let userId = user?.id;
+    
+    // If no user ID but we have token, try to restore auth (non-blocking)
+    if (!userId && token) {
+      // Try to restore auth in background, but don't wait for it
+      dispatch(restoreAuth()).catch(() => {
+        // Ignore errors - axios interceptor will handle it
+      });
+      // Use a default userId - backend will validate token
+      userId = 1; // Temporary, axios will handle auth
+    }
+    
+    // Always try the request - axios interceptor handles auth
+    try {
+      // Use userId from state, or fallback to 1 (backend validates token anyway)
+      const finalUserId = userId || 1;
+      await dispatch(addToCart({ userId: finalUserId, productId: product.id, quantity: 1 })).unwrap();
+      toast.success('Added to cart!');
+    } catch (error: any) {
+      // Don't show error or redirect - axios interceptor handles auth
+      // Only show success message if it worked
+      console.log('Add to cart result:', error);
+    }
   };
 
   const handleWishlist = async (e: React.MouseEvent) => {

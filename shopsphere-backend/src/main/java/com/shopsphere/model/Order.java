@@ -31,6 +31,7 @@ public class Order {
     private BigDecimal totalAmount;
     
     @Enumerated(EnumType.STRING)
+    @Column(length = 20) // Ensure enough space for "OUT_FOR_DELIVERY"
     private OrderStatus status = OrderStatus.PENDING;
     
     private String shippingAddress;

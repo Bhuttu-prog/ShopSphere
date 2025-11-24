@@ -22,8 +22,8 @@ public class OrderStatusUpdateService {
     @Autowired
     private OrderStatusHistoryRepository statusHistoryRepository;
     
-    // Auto-update order statuses every 5 minutes
-    @Scheduled(fixedRate = 300000) // 5 minutes in milliseconds
+    // Auto-update order statuses every 30 seconds for faster updates
+    @Scheduled(fixedRate = 30000) // 30 seconds in milliseconds
     @Transactional
     public void updateOrderStatuses() {
         List<Order> pendingOrders = orderRepository.findAll().stream()
@@ -35,35 +35,36 @@ public class OrderStatusUpdateService {
         
         for (Order order : pendingOrders) {
             LocalDateTime orderDate = order.getCreatedAt();
-            long hoursSinceOrder = ChronoUnit.HOURS.between(orderDate, now);
+            // Use minutes for faster status updates (for demo/testing purposes)
+            long minutesSinceOrder = ChronoUnit.MINUTES.between(orderDate, now);
             
             Order.OrderStatus currentStatus = order.getStatus();
             Order.OrderStatus newStatus = null;
             
-            // Progress status based on time since order
+            // Progress status based on time since order (in minutes for faster updates)
             switch (currentStatus) {
                 case PENDING:
-                    if (hoursSinceOrder >= 1) { // After 1 hour, confirm
+                    if (minutesSinceOrder >= 2) { // After 2 minutes, confirm
                         newStatus = Order.OrderStatus.CONFIRMED;
                     }
                     break;
                 case CONFIRMED:
-                    if (hoursSinceOrder >= 6) { // After 6 hours, picked up
+                    if (minutesSinceOrder >= 5) { // After 5 minutes, picked up
                         newStatus = Order.OrderStatus.PICKED_UP;
                     }
                     break;
                 case PICKED_UP:
-                    if (hoursSinceOrder >= 12) { // After 12 hours, in transit
+                    if (minutesSinceOrder >= 10) { // After 10 minutes, in transit
                         newStatus = Order.OrderStatus.IN_TRANSIT;
                     }
                     break;
                 case IN_TRANSIT:
-                    if (hoursSinceOrder >= 24) { // After 24 hours, out for delivery
+                    if (minutesSinceOrder >= 15) { // After 15 minutes, out for delivery
                         newStatus = Order.OrderStatus.OUT_FOR_DELIVERY;
                     }
                     break;
                 case OUT_FOR_DELIVERY:
-                    if (hoursSinceOrder >= 30) { // After 30 hours, delivered
+                    if (minutesSinceOrder >= 20) { // After 20 minutes, delivered
                         newStatus = Order.OrderStatus.DELIVERED;
                     }
                     break;
